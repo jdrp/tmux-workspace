@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, builder::Str};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -72,6 +72,62 @@ fn rust_workspace(name: String, root: String) -> Workspace {
     }
 }
 
+fn blank_workspace(name: String, root: String) -> Workspace {
+    Workspace {
+        name,
+        template: String::from("blank"),
+        root,
+        windows: vec![Window {
+            name: String::from("shell"),
+            command: String::from("zsh"),
+        }],
+    }
+}
+
+fn python_workspace(name: String, root: String) -> Workspace {
+    Workspace {
+        name,
+        template: String::from("python"),
+        root,
+        windows: vec![
+            Window {
+                name: String::from("editor"),
+                command: String::from("nvim ."),
+            },
+            Window {
+                name: String::from("run"),
+                command: String::from("zsh"),
+            },
+            Window {
+                name: String::from("git"),
+                command: String::from("lazygit"),
+            },
+        ],
+    }
+}
+
+fn web_workspace(name: String, root: String) -> Workspace {
+    Workspace {
+        name,
+        template: String::from("web"),
+        root,
+        windows: vec![
+            Window {
+                name: String::from("editor"),
+                command: String::from("nvim ."),
+            },
+            Window {
+                name: String::from("server"),
+                command: String::from("npm run dev"),
+            },
+            Window {
+                name: String::from("git"),
+                command: String::from("lazygit"),
+            },
+        ],
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -82,11 +138,14 @@ fn main() {
             root,
             edit,
         } => {
-
             let workspace = match template.as_str() {
+                "blank" => blank_workspace(name, root),
                 "rust" => rust_workspace(name, root),
+                "python" => python_workspace(name, root),
+                "web" => web_workspace(name, root),
                 _ => {
-                    println!("template is not implemented yet: {template}");
+                    println!("unknown template: {template}");
+                    println!("available templates: blank, rust, python, web");
                     return;
                 }
             };
