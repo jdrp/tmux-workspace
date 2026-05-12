@@ -128,6 +128,29 @@ fn web_workspace(name: String, root: String) -> Workspace {
     }
 }
 
+fn build_workspace(template: String, name: String, root: String) -> Result<Workspace, String> {
+    match template.as_str() {
+        "blank" => Ok(blank_workspace(name, root)),
+        "rust" => Ok(rust_workspace(name, root)),
+        "python" => Ok(python_workspace(name, root)),
+        "web" => Ok(web_workspace(name, root)),
+        _ => Err(format!(
+            "unknown template: {template}\navailable templates: blank, rust, python, web"
+        )),
+    }
+}
+
+fn print_workspace(workspace: &Workspace) {
+    println!("name: {}", workspace.name);
+    println!("template: {}", workspace.template);
+    println!("root: {}", workspace.root);
+    println!("windows:");
+
+    for window in &workspace.windows {
+        println!("  {}: {}", window.name, window.command);
+    }
+}
+    
 fn main() {
     let cli = Cli::parse();
 
@@ -138,28 +161,17 @@ fn main() {
             root,
             edit,
         } => {
-            let workspace = match template.as_str() {
-                "blank" => blank_workspace(name, root),
-                "rust" => rust_workspace(name, root),
-                "python" => python_workspace(name, root),
-                "web" => web_workspace(name, root),
-                _ => {
-                    println!("unknown template: {template}");
-                    println!("available templates: blank, rust, python, web");
+            let workspace = match build_workspace(template, name, root) {
+                Ok(workspace) => workspace,
+                Err(message) => {
+                    println!("{message}");
                     return;
                 }
             };
 
             println!("init");
-            println!("name: {}", workspace.name);
-            println!("template: {}", workspace.template);
-            println!("root: {}", workspace.root);
+            print_workspace(&workspace);
             println!("edit: {edit}");
-            println!("windows:");
-
-            for window in &workspace.windows {
-                println!("  {}: {}", window.name, window.command);
-            }
         }
         Commands::List => {
             println!("list");
