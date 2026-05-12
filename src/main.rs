@@ -28,6 +28,14 @@ enum Commands {
     Show {
         name: String,
     },
+    
+    Edit {
+        name: String,
+    },
+        
+    Start {
+        name: String,
+    },
 }
 
 fn main() {
@@ -51,6 +59,12 @@ fn main() {
         }
         Commands::Show { name } => {
             println!("show {name}");
+        }
+        Commands::Edit { name } => {
+            println!("edit {name}");
+        }
+        Commands::Start { name } => {
+            println!("start {name}");
         }
     }
 }
