@@ -245,7 +245,7 @@ fn print_workspace_list(workspaces: &[Workspace]) {
     }
 }
 
-fn show_workspace(name: &str) -> Result<Workspace, String> {
+fn load_workspace(name: &str) -> Result<Workspace, String> {
     let path = workspace_file_path(name);
 
     if !path.exists() {
@@ -276,6 +276,44 @@ fn edit_workspace(name: &str) -> Result<(), String> {
     if !status.success() {
         return Err(format!("editor exited with status: {status}"));
     }
+
+    Ok(())
+}
+
+fn check_tmux_exists() -> Result<(), String> {
+    let output = Command::new("tmux")
+        .arg("-V")
+        .output()
+        .map_err(|error| format!("failed to run tmux: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!("tmux exited with status: {}", output.status));
+    }
+
+    Ok(())
+}
+
+fn tmux_session_exists(name: &str) -> Result<bool, String> {
+    let output = Command::new("tmux")
+        .arg("has-session")
+        .arg("-t")
+        .arg(name)
+        .output()
+        .map_err(|error| format!("failed to check tmux session: {error}"))?;
+
+    Ok(output.status.success())
+}
+
+fn start_workspace(name: &str) -> Result<(), String> {
+    let workspace = load_workspace(name)?;
+
+    check_tmux_exists()?;
+
+    let session_exists = tmux_session_exists(&workspace.name)?;
+
+    println!("start");
+    print_workspace(&workspace);
+    println!("session exists: {session_exists}");
 
     Ok(())
 }
@@ -324,7 +362,7 @@ fn main() {
             print_workspace_list(&workspaces);
         }
         Commands::Show { name } => {
-            let workspace = match show_workspace(&name) {
+            let workspace = match load_workspace(&name) {
                 Ok(workspace) => workspace,
                 Err(message) => {
                     println!("{message}");
@@ -340,8 +378,11 @@ fn main() {
                 println!("{message}");
             }
         },
-        Commands::Start { name } => {
-            println!("start {name}");
-        }
+        Commands::Start { name } => match start_workspace(&name) {
+            Ok(()) => {}
+            Err(message) => {
+                println!("{message}");
+            }
+        },
     }
 }
