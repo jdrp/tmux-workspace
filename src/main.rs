@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use serde::Serialize;
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -38,6 +39,7 @@ enum Commands {
     },
 }
 
+#[derive(Serialize)]
 struct Workspace {
     name: String,
     template: String,
@@ -45,6 +47,7 @@ struct Workspace {
     windows: Vec<Window>,
 }
 
+#[derive(Serialize)]
 struct Window {
     name: String,
     command: String,
@@ -150,7 +153,11 @@ fn print_workspace(workspace: &Workspace) {
         println!("  {}: {}", window.name, window.command);
     }
 }
-    
+
+fn workspace_to_toml(workspace: &Workspace) -> Result<String, toml::ser::Error> {
+    toml::to_string_pretty(workspace)
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -172,6 +179,17 @@ fn main() {
             println!("init");
             print_workspace(&workspace);
             println!("edit: {edit}");
+
+            let toml = match workspace_to_toml(&workspace) {
+                Ok(toml) => toml,
+                Err(error) => {
+                    println!("failed to serialize workspace: {error}");
+                    return;
+                }
+            };
+
+            println!();
+            println!("{toml}");
         }
         Commands::List => {
             println!("list");
