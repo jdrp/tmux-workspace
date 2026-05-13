@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -39,7 +41,7 @@ enum Commands {
     },
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 struct Workspace {
     name: String,
     template: String,
@@ -47,7 +49,7 @@ struct Workspace {
     windows: Vec<Window>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 struct Window {
     name: String,
     command: String,
@@ -131,8 +133,8 @@ fn web_workspace(name: String, root: String) -> Workspace {
     }
 }
 
-fn build_workspace(template: String, name: String, root: String) -> Result<Workspace, String> {
-    match template.as_str() {
+fn build_workspace(template: &str, name: String, root: String) -> Result<Workspace, String> {
+    match template {
         "blank" => Ok(blank_workspace(name, root)),
         "rust" => Ok(rust_workspace(name, root)),
         "python" => Ok(python_workspace(name, root)),
@@ -158,6 +160,100 @@ fn workspace_to_toml(workspace: &Workspace) -> Result<String, toml::ser::Error> 
     toml::to_string_pretty(workspace)
 }
 
+fn workspaces_dir() -> PathBuf {
+    let home = std::env::var("HOME").expect("HOME environment variable is not set");
+
+    PathBuf::from(home)
+        .join(".config")
+        .join("tmux-workspace")
+        .join("workspaces")
+}
+
+fn workspace_file_path(name: &str) -> PathBuf {
+    workspaces_dir().join(format!("{name}.toml"))
+}
+
+fn write_workspace_file(workspace: &Workspace) -> Result<PathBuf, String> {
+    let dir = workspaces_dir();
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create config directory: {error}"))?;
+
+    let path = workspace_file_path(&workspace.name);
+
+    if path.exists() {
+        return Err(format!("workspace already exists: {}", path.display()));
+    }
+
+    let toml = workspace_to_toml(workspace)
+        .map_err(|error| format!("failed to serialize workspace: {error}"))?;
+
+    fs::write(&path, toml).map_err(|error| format!("failed to write workspace file: {error}"))?;
+
+    Ok(path)
+}
+
+fn read_workspace_file(path: &PathBuf) -> Result<Workspace, String> {
+    let content =
+        fs::read_to_string(path).map_err(|error| format!("failed to read file: {error}"))?;
+
+    toml::from_str::<Workspace>(&content).map_err(|error| format!("failed to parse TOML: {error}"))
+}
+
+fn list_workspaces() -> Result<Vec<Workspace>, String> {
+    let dir = workspaces_dir();
+
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let entries =
+        fs::read_dir(&dir).map_err(|error| format!("failed to read workspaces dir: {error}"))?;
+
+    let mut workspaces = Vec::new();
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("failed to read directory entry: {error}"))?;
+        let path = entry.path();
+
+        if path.extension().and_then(|extension| extension.to_str()) != Some("toml") {
+            continue;
+        }
+
+        match read_workspace_file(&path) {
+            Ok(workspace) => workspaces.push(workspace),
+            Err(message) => {
+                println!("skipping {}: {message}", path.display());
+            }
+        }
+    }
+
+    Ok(workspaces)
+}
+
+fn print_workspace_list(workspaces: &[Workspace]) {
+    if workspaces.is_empty() {
+        println!("no workspaces found");
+        return;
+    }
+
+    for workspace in workspaces {
+        println!(
+            "{}\t{}\t{}",
+            workspace.name, workspace.template, workspace.root
+        );
+    }
+}
+
+fn show_workspace(name: &str) -> Result<Workspace, String> {
+    let path = workspace_file_path(name);
+
+    if !path.exists() {
+        return Err(format!("workspace not found: {}", path.display()));
+    }
+
+    read_workspace_file(&path)
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -168,7 +264,7 @@ fn main() {
             root,
             edit,
         } => {
-            let workspace = match build_workspace(template, name, root) {
+            let workspace = match build_workspace(&template, name, root) {
                 Ok(workspace) => workspace,
                 Err(message) => {
                     println!("{message}");
@@ -180,22 +276,37 @@ fn main() {
             print_workspace(&workspace);
             println!("edit: {edit}");
 
-            let toml = match workspace_to_toml(&workspace) {
-                Ok(toml) => toml,
-                Err(error) => {
-                    println!("failed to serialize workspace: {error}");
+            let path = match write_workspace_file(&workspace) {
+                Ok(path) => path,
+                Err(message) => {
+                    println!("{message}");
                     return;
                 }
             };
 
-            println!();
-            println!("{toml}");
+            println!("created: {}", path.display());
         }
         Commands::List => {
-            println!("list");
+            let workspaces = match list_workspaces() {
+                Ok(workspaces) => workspaces,
+                Err(message) => {
+                    println!("{message}");
+                    return;
+                }
+            };
+
+            print_workspace_list(&workspaces);
         }
         Commands::Show { name } => {
-            println!("show {name}");
+            let workspace = match show_workspace(&name) {
+                Ok(workspace) => workspace,
+                Err(message) => {
+                    println!("{message}");
+                    return;
+                }
+            };
+
+            print_workspace(&workspace);
         }
         Commands::Edit { name } => {
             println!("edit {name}");
