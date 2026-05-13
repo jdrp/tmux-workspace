@@ -97,6 +97,36 @@ tw edit NAME
 tw start NAME
 ```
 
+### Current implementation status
+
+The current implementation supports the first functional milestone when run through Cargo:
+
+```bash
+cargo run -- init demo --template rust --root .
+cargo run -- list
+cargo run -- show demo
+```
+
+Implemented so far:
+
+- CLI parsing with `clap`
+- subcommands: `init`, `list`, `show`, `edit`, `start`
+- built-in templates: `blank`, `rust`, `python`, `web`
+- workspace model: `Workspace` and `Window`
+- TOML serialization and deserialization with `serde` and `toml`
+- writing workspace files to `~/.config/tmux-workspace/workspaces/`
+- refusing to overwrite existing workspace files
+- listing available workspace TOML files
+- showing a parsed workspace without running tmux
+
+Still pending:
+
+- `tw edit NAME` opening the workspace TOML in `$EDITOR`
+- `--edit` opening the TOML after `init`
+- `tw start NAME` launching or attaching to tmux
+- installing or aliasing the daily command as `tw` outside `cargo run --`
+
+
 ### MVP behavior
 
 #### `tw init`
@@ -145,17 +175,16 @@ Example:
 tw show tmux-workspace
 ```
 
-Example output:
+Current output shape:
 
 ```text
-Workspace: tmux-workspace
-Template: rust
-Root: ~/projects/tmux-workspace
-
-Windows:
-  1. editor    nvim .
-  2. test      zsh
-  3. git       lazygit
+name: tmux-workspace
+template: rust
+root: ~/projects/tmux-workspace
+windows:
+  editor: nvim .
+  test: zsh
+  git: lazygit
 ```
 
 #### `tw edit`
@@ -173,6 +202,8 @@ Expected behavior:
 ```bash
 $EDITOR ~/.config/tmux-workspace/workspaces/tmux-workspace.toml
 ```
+
+Current status: the `edit` subcommand exists in the CLI skeleton, but opening the editor is not implemented yet.
 
 #### `tw start`
 
@@ -353,50 +384,51 @@ Rules for a future bootstrap feature:
 
 ### Phase 0: project setup
 
-- [ ] Create Rust project with Cargo
-- [ ] Add README
-- [ ] Add initial Git commit
-- [ ] Create development tmux session
-- [ ] Use Neovim for all editing
+- [x] Create Rust project with Cargo
+- [x] Add README
+- [x] Add initial Git commit
+- [x] Create development tmux session
+- [x] Use Neovim for all editing
 
 ### Phase 1: CLI skeleton
 
-- [ ] Add `clap`
-- [ ] Create `tw --help`
-- [ ] Add subcommands:
-  - [ ] `init`
-  - [ ] `list`
-  - [ ] `show`
-  - [ ] `edit`
-  - [ ] `start`
+- [x] Add `clap`
+- [x] Create `tw --help`
+- [x] Add subcommands:
+  - [x] `init`
+  - [x] `list`
+  - [x] `show`
+  - [x] `edit`
+  - [x] `start`
 
 ### Phase 2: data model
 
 - [ ] Define Rust structs:
-  - [ ] `Workspace`
-  - [ ] `Window`
-  - [ ] `Template`
-- [ ] Parse TOML with `serde`
-- [ ] Serialize TOML with `toml`
+  - [x] `Workspace`
+  - [x] `Window`
+  - [ ] `Template` enum or dedicated type (templates are currently internal functions)
+- [x] Parse TOML with `serde`
+- [x] Serialize TOML with `toml`
 - [ ] Expand `~` in paths
 - [ ] Validate required fields
 
 ### Phase 3: init and templates
 
-- [ ] Implement blank template
-- [ ] Implement Rust template
-- [ ] Implement Python template
-- [ ] Implement Web template
-- [ ] Write workspace TOML files to config directory
-- [ ] Add `--root`
-- [ ] Add `--edit`
-- [ ] Avoid overwriting existing workspace files unless `--force` is added later
+- [x] Implement blank template
+- [x] Implement Rust template
+- [x] Implement Python template
+- [x] Implement Web template
+- [x] Write workspace TOML files to config directory
+- [x] Add `--root`
+- [x] Parse `--edit` flag
+- [ ] Open TOML after `init` when `--edit` is passed
+- [x] Avoid overwriting existing workspace files unless `--force` is added later
 
 ### Phase 4: list, show, edit
 
-- [ ] List workspace TOML files
-- [ ] Parse each workspace for display
-- [ ] Pretty-print a workspace
+- [x] List workspace TOML files
+- [x] Parse each workspace for display
+- [x] Pretty-print a workspace
 - [ ] Open workspace file using `$EDITOR`
 - [ ] Fall back to `nvim` if `$EDITOR` is not set
 
@@ -573,6 +605,8 @@ tw init demo --template rust --root .
 tw list
 tw show demo
 ```
+
+Status: completed at the functional level through `cargo run --`.
 
 No tmux launching is required for the first milestone.
 
