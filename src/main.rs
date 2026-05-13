@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -254,6 +255,31 @@ fn show_workspace(name: &str) -> Result<Workspace, String> {
     read_workspace_file(&path)
 }
 
+fn editor_command() -> String {
+    std::env::var("EDITOR").unwrap_or_else(|_| String::from("nvim"))
+}
+
+fn edit_workspace(name: &str) -> Result<(), String> {
+    let path = workspace_file_path(name);
+
+    if !path.exists() {
+        return Err(format!("workspace not found: {}", path.display()));
+    }
+
+    let editor = editor_command();
+
+    let status = Command::new(&editor)
+        .arg(&path)
+        .status()
+        .map_err(|error| format!("failed to open editor '{editor}': {error}"))?;
+
+    if !status.success() {
+        return Err(format!("editor exited with status: {status}"));
+    }
+
+    Ok(())
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -308,9 +334,12 @@ fn main() {
 
             print_workspace(&workspace);
         }
-        Commands::Edit { name } => {
-            println!("edit {name}");
-        }
+        Commands::Edit { name } => match edit_workspace(&name) {
+            Ok(()) => {}
+            Err(message) => {
+                println!("{message}");
+            }
+        },
         Commands::Start { name } => {
             println!("start {name}");
         }
