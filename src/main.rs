@@ -304,6 +304,29 @@ fn tmux_session_exists(name: &str) -> Result<bool, String> {
     Ok(output.status.success())
 }
 
+fn create_tmux_window(session_name: &str, root: &str, window: &Window) -> Result<(), String> {
+    let output = Command::new("tmux")
+        .arg("new-window")
+        .arg("-t")
+        .arg(session_name)
+        .arg("-c")
+        .arg(root)
+        .arg("-n")
+        .arg(&window.name)
+        .arg(&window.command)
+        .output()
+        .map_err(|error| format!("failed to create tmux window: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "tmux new-window failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(())
+}
+
 fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
     let first_window = workspace
         .windows
@@ -328,6 +351,10 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
             "tmux new-session failed: {}",
             String::from_utf8_lossy(&output.stderr)
         ));
+    }
+
+    for window in workspace.windows.iter().skip(1) {
+        create_tmux_window(&workspace.name, &workspace.root, window)?;
     }
 
     Ok(())
