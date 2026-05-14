@@ -304,12 +304,45 @@ fn tmux_session_exists(name: &str) -> Result<bool, String> {
     Ok(output.status.success())
 }
 
+fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
+    let first_window = workspace
+        .windows
+        .first()
+        .ok_or_else(|| String::from("workspace has no windows"))?;
+
+    let output = Command::new("tmux")
+        .arg("new-session")
+        .arg("-d")
+        .arg("-s")
+        .arg(&workspace.name)
+        .arg("-c")
+        .arg(&workspace.root)
+        .arg("-n")
+        .arg(&first_window.name)
+        .arg(&first_window.command)
+        .output()
+        .map_err(|error| format!("failed to create tmux session: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "tmux new-session failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(())
+}
+
 fn start_workspace(name: &str) -> Result<(), String> {
     let workspace = load_workspace(name)?;
 
     check_tmux_exists()?;
 
     let session_exists = tmux_session_exists(&workspace.name)?;
+
+    if !session_exists {
+        create_tmux_session(&workspace)?;
+    }
 
     println!("start");
     print_workspace(&workspace);
