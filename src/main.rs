@@ -433,6 +433,15 @@ fn main() {
             };
 
             println!("created: {}", path.display());
+
+            if edit {
+                match edit_workspace(&workspace.name) {
+                    Ok(()) => {}
+                    Err(message) => {
+                        println!("{message}");
+                    }
+                }
+            }
         }
         Commands::List => {
             let workspaces = match list_workspaces() {
