@@ -47,6 +47,15 @@ tw
 
 The long binary name can remain available, but daily usage should be short and comfortable.
 
+Current development usage is still through Cargo:
+
+```bash
+cargo run -- init demo --template rust --root .
+cargo run -- start demo
+```
+
+Installing or aliasing the daily command as `tw` is still pending.
+
 ## Core concepts
 
 ### Workspace
@@ -65,19 +74,25 @@ It has:
 
 A template is a predefined TOML shape for common project types.
 
-Examples:
+Currently implemented built-in templates:
 
 - blank
 - rust
 - python
 - web
-- dotfiles
 
 Templates create workspace TOML files. They do not automatically create the actual project unless a future explicit bootstrap command is added.
 
 ### Start
 
 Starting a workspace means reading its TOML file and creating or attaching to the corresponding tmux session.
+
+Current behavior:
+
+- if the tmux session already exists, `start` enters it
+- if the session does not exist, `start` creates it first
+- when running inside tmux, `start` uses `tmux switch-client`
+- when running outside tmux, `start` uses `tmux attach-session`
 
 ## MVP
 
@@ -99,7 +114,14 @@ tw start NAME
 
 ### Current implementation status
 
-The current implementation supports the first functional milestone when run through Cargo:
+The current implementation supports the first GitHub-worthy milestone when run through Cargo:
+
+```bash
+cargo run -- init demo --template rust --root .
+cargo run -- start demo
+```
+
+The first smaller functional milestone is also complete:
 
 ```bash
 cargo run -- init demo --template rust --root .
@@ -118,14 +140,25 @@ Implemented so far:
 - refusing to overwrite existing workspace files
 - listing available workspace TOML files
 - showing a parsed workspace without running tmux
+- opening a workspace TOML with `$EDITOR`
+- falling back to `nvim` when `$EDITOR` is not set
+- checking whether `tmux` exists
+- checking whether a tmux session already exists
+- creating detached tmux sessions
+- creating tmux windows from the workspace TOML
+- running tmux windows in the configured root directory
+- attaching to an existing or newly created tmux session
+- using `switch-client` instead of nested `attach` when already inside tmux
 
 Still pending:
 
-- `tw edit NAME` opening the workspace TOML in `$EDITOR`
-- `--edit` opening the TOML after `init`
-- `tw start NAME` launching or attaching to tmux
+- `--edit` opening the TOML immediately after `init`
 - installing or aliasing the daily command as `tw` outside `cargo run --`
-
+- expanding `~` in paths
+- validating workspace files more strictly
+- adding tests
+- adding `--dry-run` for `start`
+- improving error handling with `anyhow` or `thiserror`
 
 ### MVP behavior
 
@@ -153,6 +186,18 @@ tw init notes --template blank --root ~/notes
 tw init portfolio --template web --root ~/projects/portfolio --edit
 ```
 
+Current development usage:
+
+```bash
+cargo run -- init tmux-workspace --template rust --root .
+```
+
+Current notes:
+
+- `init` writes a TOML file to `~/.config/tmux-workspace/workspaces/`
+- existing workspace files are not overwritten
+- `--edit` is parsed but does not yet open the file after creation
+
 #### `tw list`
 
 Lists available workspaces.
@@ -163,6 +208,18 @@ Example output:
 tmux-workspace    rust      ~/projects/tmux-workspace
 dotfiles          blank     ~/dotfiles
 portfolio         web       ~/projects/portfolio
+```
+
+Current implementation reads `.toml` files from:
+
+```text
+~/.config/tmux-workspace/workspaces/
+```
+
+It parses each workspace file and prints:
+
+```text
+name    template    root
 ```
 
 #### `tw show`
@@ -203,7 +260,13 @@ Expected behavior:
 $EDITOR ~/.config/tmux-workspace/workspaces/tmux-workspace.toml
 ```
 
-Current status: the `edit` subcommand exists in the CLI skeleton, but opening the editor is not implemented yet.
+Current status: implemented.
+
+Behavior:
+
+- opens the workspace TOML with `$EDITOR`
+- falls back to `nvim` if `$EDITOR` is not set
+- returns a readable error if the workspace does not exist
 
 #### `tw start`
 
@@ -225,6 +288,19 @@ tmux attach -t tmux-workspace
 ```
 
 The Rust program should not rely on a single shell string if it can avoid it. It should call `tmux` through `std::process::Command`.
+
+Current status: implemented.
+
+Behavior:
+
+- reads the workspace TOML
+- checks that `tmux` exists
+- checks whether the target session already exists
+- creates the session if needed
+- creates the configured windows
+- uses the workspace root as the tmux working directory
+- switches to the session when already inside tmux
+- attaches to the session when outside tmux
 
 ## Proposed config directory
 
@@ -429,18 +505,18 @@ Rules for a future bootstrap feature:
 - [x] List workspace TOML files
 - [x] Parse each workspace for display
 - [x] Pretty-print a workspace
-- [ ] Open workspace file using `$EDITOR`
-- [ ] Fall back to `nvim` if `$EDITOR` is not set
+- [x] Open workspace file using `$EDITOR`
+- [x] Fall back to `nvim` if `$EDITOR` is not set
 
 ### Phase 5: start tmux
 
-- [ ] Check whether `tmux` exists
-- [ ] Check whether a session already exists
-- [ ] Create detached tmux session
-- [ ] Create windows
-- [ ] Run commands in the correct root directory
-- [ ] Attach to the session
-- [ ] Give readable errors if tmux fails
+- [x] Check whether `tmux` exists
+- [x] Check whether a session already exists
+- [x] Create detached tmux session
+- [x] Create windows
+- [x] Run commands in the correct root directory
+- [x] Attach to the session
+- [x] Give readable errors if tmux fails
 
 ### Phase 6: polish
 
@@ -466,21 +542,28 @@ Rules for a future bootstrap feature:
 
 This project should be used to learn Rust gradually.
 
-Topics to learn while building:
+Topics learned or touched so far:
 
 - Cargo project structure
-- modules
 - structs and enums
 - `Result`
 - error propagation with `?`
 - ownership and borrowing
-- `Path` and `PathBuf`
+- `String` vs `&str`
+- `PathBuf`
 - `std::process::Command`
 - reading and writing files
 - parsing TOML
+- serializing TOML
 - CLI design with `clap`
-- testing
 - formatting with `cargo fmt`
+
+Topics still to practice more deeply:
+
+- modules
+- custom error types
+- `Path` vs `PathBuf`
+- testing
 - linting with `cargo clippy`
 
 ## Development workflow
@@ -496,7 +579,10 @@ window 1: editor
 window 2: run
   cargo run -- --help
   cargo run -- init test --template rust --root .
+  cargo run -- list
   cargo run -- show test
+  cargo run -- edit test
+  cargo run -- start test
 
 window 3: test
   cargo test
@@ -610,6 +696,8 @@ Status: completed at the functional level through `cargo run --`.
 
 No tmux launching is required for the first milestone.
 
+## First GitHub-worthy milestone
+
 The first GitHub-worthy milestone is:
 
 ```bash
@@ -617,7 +705,16 @@ tw init demo --template rust --root .
 tw start demo
 ```
 
-That should create or attach to a tmux session with the windows defined in the generated TOML.
+Status: completed at the functional level through `cargo run --`.
+
+This creates or attaches to a tmux session with the windows defined in the generated TOML.
+
+Still pending before daily usage feels complete:
+
+- install or alias the binary as `tw`
+- decide whether to keep both `tmux-workspace` and `tw` binary names
+- improve path handling for `.` and `~`
+- add tests
 
 ## Non-goals for the MVP
 
