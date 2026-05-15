@@ -6,6 +6,7 @@ use std::process::Command;
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
+#[command(version)]
 #[command(about = "Launch repeatable tmux workspaces from TOML files")]
 struct Cli {
     #[command(subcommand)]
@@ -14,6 +15,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "Create a new workspace TOML file")]
     Init {
         name: String,
 
@@ -27,16 +29,20 @@ enum Commands {
         edit: bool,
     },
 
+    #[command(about = "List available workspaces")]
     List,
 
+    #[command(about = "Show workspace structure without starting tmux")]
     Show {
         name: String,
     },
 
+    #[command(about = "Open a workspace TOML file in $EDITOR")]
     Edit {
         name: String,
     },
 
+    #[command(about = "Create or attach to a tmux workspace session")]
     Start {
         name: String,
     },
