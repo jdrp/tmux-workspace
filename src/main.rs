@@ -360,6 +360,32 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
     Ok(())
 }
 
+fn attach_tmux_session(session_name: &str) -> Result<(), String> {
+    let inside_tmux = std::env::var("TMUX").is_ok();
+
+    let status = if inside_tmux {
+        Command::new("tmux")
+            .arg("switch-client")
+            .arg("-t")
+            .arg(session_name)
+            .status()
+            .map_err(|error| format!("failed to switch tmux client: {error}"))?
+    } else {
+        Command::new("tmux")
+            .arg("attach-session")
+            .arg("-t")
+            .arg(session_name)
+            .status()
+            .map_err(|error| format!("failed to attach tmux session: {error}"))?
+    };
+
+    if !status.success() {
+        return Err(format!("tmux attach failed with status: {status}"));
+    }
+
+    Ok(())
+}
+
 fn start_workspace(name: &str) -> Result<(), String> {
     let workspace = load_workspace(name)?;
 
@@ -371,9 +397,7 @@ fn start_workspace(name: &str) -> Result<(), String> {
         create_tmux_session(&workspace)?;
     }
 
-    println!("start");
-    print_workspace(&workspace);
-    println!("session exists: {session_exists}");
+    attach_tmux_session(&workspace.name)?;
 
     Ok(())
 }
