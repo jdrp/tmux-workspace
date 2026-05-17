@@ -33,19 +33,13 @@ enum Commands {
     List,
 
     #[command(about = "Show workspace structure without starting tmux")]
-    Show {
-        name: String,
-    },
+    Show { name: String },
 
     #[command(about = "Open a workspace TOML file in $EDITOR")]
-    Edit {
-        name: String,
-    },
+    Edit { name: String },
 
     #[command(about = "Create or attach to a tmux workspace session")]
-    Start {
-        name: String,
-    },
+    Start { name: String },
 }
 
 #[derive(Deserialize, Serialize)]
@@ -178,6 +172,34 @@ fn workspaces_dir() -> PathBuf {
 
 fn workspace_file_path(name: &str) -> PathBuf {
     workspaces_dir().join(format!("{name}.toml"))
+}
+
+fn normalize_root(root: &str) -> Result<String, String> {
+    let path = if root == "~" {
+        let home = std::env::var("HOME")
+            .map_err(|_| String::from("HOME environment variable is not set"))?;
+        PathBuf::from(home)
+    } else if let Some(rest) = root.strip_prefix("~/") {
+        let home = std::env::var("HOME")
+            .map_err(|_| String::from("HOME environment variable is not set"))?;
+        PathBuf::from(home).join(rest)
+    } else {
+        PathBuf::from(root)
+    };
+
+    let absolute_path = if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("failed to read current directory: {error}"))?
+            .join(path)
+    };
+
+    let canonical_path = absolute_path
+        .canonicalize()
+        .map_err(|error| format!("failed to resolve root path: {error}"))?;
+
+    Ok(canonical_path.display().to_string())
 }
 
 fn write_workspace_file(workspace: &Workspace) -> Result<PathBuf, String> {
@@ -418,6 +440,14 @@ fn main() {
             root,
             edit,
         } => {
+            let root = match normalize_root(&root) {
+                Ok(root) => root,
+                Err(message) => {
+                    println!("{message}");
+                    return;
+                }
+            };
+
             let workspace = match build_workspace(&template, name, root) {
                 Ok(workspace) => workspace,
                 Err(message) => {
@@ -428,7 +458,6 @@ fn main() {
 
             println!("init");
             print_workspace(&workspace);
-            println!("edit: {edit}");
 
             let path = match write_workspace_file(&workspace) {
                 Ok(path) => path,
