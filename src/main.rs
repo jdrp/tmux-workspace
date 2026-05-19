@@ -1,8 +1,11 @@
+mod workspace;
+
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+
+use crate::workspace::{print_workspace, workspace_to_toml, Window, Workspace};
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -40,20 +43,6 @@ enum Commands {
 
     #[command(about = "Create or attach to a tmux workspace session")]
     Start { name: String },
-}
-
-#[derive(Deserialize, Serialize)]
-struct Workspace {
-    name: String,
-    template: String,
-    root: String,
-    windows: Vec<Window>,
-}
-
-#[derive(Deserialize, Serialize)]
-struct Window {
-    name: String,
-    command: String,
 }
 
 fn rust_workspace(name: String, root: String) -> Workspace {
@@ -144,21 +133,6 @@ fn build_workspace(template: &str, name: String, root: String) -> Result<Workspa
             "unknown template: {template}\navailable templates: blank, rust, python, web"
         )),
     }
-}
-
-fn print_workspace(workspace: &Workspace) {
-    println!("name: {}", workspace.name);
-    println!("template: {}", workspace.template);
-    println!("root: {}", workspace.root);
-    println!("windows:");
-
-    for window in &workspace.windows {
-        println!("  {}: {}", window.name, window.command);
-    }
-}
-
-fn workspace_to_toml(workspace: &Workspace) -> Result<String, toml::ser::Error> {
-    toml::to_string_pretty(workspace)
 }
 
 fn workspaces_dir() -> PathBuf {
