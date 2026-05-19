@@ -1,3 +1,4 @@
+mod editor;
 mod storage;
 mod templates;
 mod workspace;
@@ -5,9 +6,9 @@ mod workspace;
 use clap::{Parser, Subcommand};
 use std::process::Command;
 
+use crate::editor::edit_workspace;
 use crate::storage::{
-    list_workspaces, load_workspace, normalize_root, print_workspace_list, workspace_file_path,
-    write_workspace_file,
+    list_workspaces, load_workspace, normalize_root, print_workspace_list, write_workspace_file,
 };
 use crate::templates::build_workspace;
 use crate::workspace::{Window, Workspace, print_workspace};
@@ -48,31 +49,6 @@ enum Commands {
 
     #[command(about = "Create or attach to a tmux workspace session")]
     Start { name: String },
-}
-
-fn editor_command() -> String {
-    std::env::var("EDITOR").unwrap_or_else(|_| String::from("nvim"))
-}
-
-fn edit_workspace(name: &str) -> Result<(), String> {
-    let path = workspace_file_path(name);
-
-    if !path.exists() {
-        return Err(format!("workspace not found: {}", path.display()));
-    }
-
-    let editor = editor_command();
-
-    let status = Command::new(&editor)
-        .arg(&path)
-        .status()
-        .map_err(|error| format!("failed to open editor '{editor}': {error}"))?;
-
-    if !status.success() {
-        return Err(format!("editor exited with status: {status}"));
-    }
-
-    Ok(())
 }
 
 fn check_tmux_exists() -> Result<(), String> {
