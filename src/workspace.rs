@@ -28,4 +28,3 @@ pub fn print_workspace(workspace: &Workspace) {
 pub fn workspace_to_toml(workspace: &Workspace) -> Result<String, toml::ser::Error> {
     toml::to_string_pretty(workspace)
 }
-

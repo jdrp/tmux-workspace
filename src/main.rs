@@ -1,11 +1,16 @@
+mod storage;
+mod templates;
 mod workspace;
 
 use clap::{Parser, Subcommand};
-use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 
-use crate::workspace::{print_workspace, workspace_to_toml, Window, Workspace};
+use crate::storage::{
+    list_workspaces, load_workspace, normalize_root, print_workspace_list, workspace_file_path,
+    write_workspace_file,
+};
+use crate::templates::build_workspace;
+use crate::workspace::{Window, Workspace, print_workspace};
 
 #[derive(Parser)]
 #[command(name = "tw", bin_name = "tw")]
@@ -43,218 +48,6 @@ enum Commands {
 
     #[command(about = "Create or attach to a tmux workspace session")]
     Start { name: String },
-}
-
-fn rust_workspace(name: String, root: String) -> Workspace {
-    Workspace {
-        name,
-        template: String::from("rust"),
-        root,
-        windows: vec![
-            Window {
-                name: String::from("editor"),
-                command: String::from("nvim ."),
-            },
-            Window {
-                name: String::from("test"),
-                command: String::from("zsh"),
-            },
-            Window {
-                name: String::from("git"),
-                command: String::from("lazygit"),
-            },
-        ],
-    }
-}
-
-fn blank_workspace(name: String, root: String) -> Workspace {
-    Workspace {
-        name,
-        template: String::from("blank"),
-        root,
-        windows: vec![Window {
-            name: String::from("shell"),
-            command: String::from("zsh"),
-        }],
-    }
-}
-
-fn python_workspace(name: String, root: String) -> Workspace {
-    Workspace {
-        name,
-        template: String::from("python"),
-        root,
-        windows: vec![
-            Window {
-                name: String::from("editor"),
-                command: String::from("nvim ."),
-            },
-            Window {
-                name: String::from("run"),
-                command: String::from("zsh"),
-            },
-            Window {
-                name: String::from("git"),
-                command: String::from("lazygit"),
-            },
-        ],
-    }
-}
-
-fn web_workspace(name: String, root: String) -> Workspace {
-    Workspace {
-        name,
-        template: String::from("web"),
-        root,
-        windows: vec![
-            Window {
-                name: String::from("editor"),
-                command: String::from("nvim ."),
-            },
-            Window {
-                name: String::from("server"),
-                command: String::from("npm run dev"),
-            },
-            Window {
-                name: String::from("git"),
-                command: String::from("lazygit"),
-            },
-        ],
-    }
-}
-
-fn build_workspace(template: &str, name: String, root: String) -> Result<Workspace, String> {
-    match template {
-        "blank" => Ok(blank_workspace(name, root)),
-        "rust" => Ok(rust_workspace(name, root)),
-        "python" => Ok(python_workspace(name, root)),
-        "web" => Ok(web_workspace(name, root)),
-        _ => Err(format!(
-            "unknown template: {template}\navailable templates: blank, rust, python, web"
-        )),
-    }
-}
-
-fn workspaces_dir() -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME environment variable is not set");
-
-    PathBuf::from(home)
-        .join(".config")
-        .join("tmux-workspace")
-        .join("workspaces")
-}
-
-fn workspace_file_path(name: &str) -> PathBuf {
-    workspaces_dir().join(format!("{name}.toml"))
-}
-
-fn normalize_root(root: &str) -> Result<String, String> {
-    let path = if root == "~" {
-        let home = std::env::var("HOME")
-            .map_err(|_| String::from("HOME environment variable is not set"))?;
-        PathBuf::from(home)
-    } else if let Some(rest) = root.strip_prefix("~/") {
-        let home = std::env::var("HOME")
-            .map_err(|_| String::from("HOME environment variable is not set"))?;
-        PathBuf::from(home).join(rest)
-    } else {
-        PathBuf::from(root)
-    };
-
-    let absolute_path = if path.is_absolute() {
-        path
-    } else {
-        std::env::current_dir()
-            .map_err(|error| format!("failed to read current directory: {error}"))?
-            .join(path)
-    };
-
-    let canonical_path = absolute_path
-        .canonicalize()
-        .map_err(|error| format!("failed to resolve root path: {error}"))?;
-
-    Ok(canonical_path.display().to_string())
-}
-
-fn write_workspace_file(workspace: &Workspace) -> Result<PathBuf, String> {
-    let dir = workspaces_dir();
-    fs::create_dir_all(&dir)
-        .map_err(|error| format!("failed to create config directory: {error}"))?;
-
-    let path = workspace_file_path(&workspace.name);
-
-    if path.exists() {
-        return Err(format!("workspace already exists: {}", path.display()));
-    }
-
-    let toml = workspace_to_toml(workspace)
-        .map_err(|error| format!("failed to serialize workspace: {error}"))?;
-
-    fs::write(&path, toml).map_err(|error| format!("failed to write workspace file: {error}"))?;
-
-    Ok(path)
-}
-
-fn read_workspace_file(path: &PathBuf) -> Result<Workspace, String> {
-    let content =
-        fs::read_to_string(path).map_err(|error| format!("failed to read file: {error}"))?;
-
-    toml::from_str::<Workspace>(&content).map_err(|error| format!("failed to parse TOML: {error}"))
-}
-
-fn list_workspaces() -> Result<Vec<Workspace>, String> {
-    let dir = workspaces_dir();
-
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let entries =
-        fs::read_dir(&dir).map_err(|error| format!("failed to read workspaces dir: {error}"))?;
-
-    let mut workspaces = Vec::new();
-
-    for entry in entries {
-        let entry = entry.map_err(|error| format!("failed to read directory entry: {error}"))?;
-        let path = entry.path();
-
-        if path.extension().and_then(|extension| extension.to_str()) != Some("toml") {
-            continue;
-        }
-
-        match read_workspace_file(&path) {
-            Ok(workspace) => workspaces.push(workspace),
-            Err(message) => {
-                println!("skipping {}: {message}", path.display());
-            }
-        }
-    }
-
-    Ok(workspaces)
-}
-
-fn print_workspace_list(workspaces: &[Workspace]) {
-    if workspaces.is_empty() {
-        println!("no workspaces found");
-        return;
-    }
-
-    for workspace in workspaces {
-        println!(
-            "{}\t{}\t{}",
-            workspace.name, workspace.template, workspace.root
-        );
-    }
-}
-
-fn load_workspace(name: &str) -> Result<Workspace, String> {
-    let path = workspace_file_path(name);
-
-    if !path.exists() {
-        return Err(format!("workspace not found: {}", path.display()));
-    }
-
-    read_workspace_file(&path)
 }
 
 fn editor_command() -> String {
