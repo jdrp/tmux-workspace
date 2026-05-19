@@ -10,7 +10,7 @@ use crate::editor::edit_workspace;
 use crate::storage::{
     list_workspaces, load_workspace, normalize_root, print_workspace_list, write_workspace_file,
 };
-use crate::templates::build_workspace;
+use crate::templates::{Template, build_workspace};
 use crate::tmux::start_workspace;
 use crate::workspace::print_workspace;
 
@@ -29,8 +29,8 @@ enum Commands {
     Init {
         name: String,
 
-        #[arg(long, default_value = "blank")]
-        template: String,
+        #[arg(long, value_enum, default_value_t = Template::Blank)]
+        template: Template,
 
         #[arg(long, default_value = ".")]
         root: String,
@@ -70,13 +70,7 @@ fn main() {
                 }
             };
 
-            let workspace = match build_workspace(&template, name, root) {
-                Ok(workspace) => workspace,
-                Err(message) => {
-                    println!("{message}");
-                    return;
-                }
-            };
+            let workspace = build_workspace(template, name, root);
 
             println!("init");
             print_workspace(&workspace);

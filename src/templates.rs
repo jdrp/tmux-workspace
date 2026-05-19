@@ -1,9 +1,36 @@
+use clap::ValueEnum;
+
 use crate::workspace::{Window, Workspace};
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum Template {
+    Blank,
+    Rust,
+    Python,
+    Web,
+}
+
+impl Template {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Template::Blank => "blank",
+            Template::Rust => "rust",
+            Template::Python => "python",
+            Template::Web => "web",
+        }
+    }
+}
+
+impl std::fmt::Display for Template {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
 
 fn blank_workspace(name: String, root: String) -> Workspace {
     Workspace {
         name,
-        template: String::from("blank"),
+        template: Template::Blank.as_str().to_string(),
         root,
         windows: vec![Window {
             name: String::from("shell"),
@@ -15,7 +42,7 @@ fn blank_workspace(name: String, root: String) -> Workspace {
 fn rust_workspace(name: String, root: String) -> Workspace {
     Workspace {
         name,
-        template: String::from("rust"),
+        template: Template::Rust.as_str().to_string(),
         root,
         windows: vec![
             Window {
@@ -37,7 +64,7 @@ fn rust_workspace(name: String, root: String) -> Workspace {
 fn python_workspace(name: String, root: String) -> Workspace {
     Workspace {
         name,
-        template: String::from("python"),
+        template: Template::Python.as_str().to_string(),
         root,
         windows: vec![
             Window {
@@ -59,7 +86,7 @@ fn python_workspace(name: String, root: String) -> Workspace {
 fn web_workspace(name: String, root: String) -> Workspace {
     Workspace {
         name,
-        template: String::from("web"),
+        template: Template::Web.as_str().to_string(),
         root,
         windows: vec![
             Window {
@@ -78,14 +105,11 @@ fn web_workspace(name: String, root: String) -> Workspace {
     }
 }
 
-pub fn build_workspace(template: &str, name: String, root: String) -> Result<Workspace, String> {
+pub fn build_workspace(template: Template, name: String, root: String) -> Workspace {
     match template {
-        "blank" => Ok(blank_workspace(name, root)),
-        "rust" => Ok(rust_workspace(name, root)),
-        "python" => Ok(python_workspace(name, root)),
-        "web" => Ok(web_workspace(name, root)),
-        _ => Err(format!(
-            "unknown template: {template}\navailable templates: blank, rust, python, web"
-        )),
+        Template::Blank => blank_workspace(name, root),
+        Template::Rust => rust_workspace(name, root),
+        Template::Python => python_workspace(name, root),
+        Template::Web => web_workspace(name, root),
     }
 }
