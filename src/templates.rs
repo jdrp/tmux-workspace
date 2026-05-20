@@ -113,3 +113,49 @@ pub fn build_workspace(template: Template, name: String, root: String) -> Worksp
         Template::Web => web_workspace(name, root),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blank_template_creates_shell_window() {
+        let workspace = build_workspace(
+            Template::Blank,
+            String::from("notes"),
+            String::from("/home/test/notes"),
+        );
+
+        assert_eq!(workspace.name, "notes");
+        assert_eq!(workspace.template, "blank");
+        assert_eq!(workspace.root, "/home/test/notes");
+        
+        assert_eq!(workspace.windows.len(), 1);
+        assert_eq!(workspace.windows[0].name, "shell");
+        assert_eq!(workspace.windows[0].command, "zsh");
+    }
+
+    #[test]
+    fn rust_template_creates_editor_test_and_git_windows() {
+        let workspace = build_workspace(
+            Template::Rust,
+            String::from("tmux-workspace"),
+            String::from("/home/test/tmux-workspace"),
+        );
+
+        assert_eq!(workspace.name, "tmux-workspace");
+        assert_eq!(workspace.template, "rust");
+        assert_eq!(workspace.root, "/home/test/tmux-workspace");
+
+        assert_eq!(workspace.windows.len(), 3);
+
+        assert_eq!(workspace.windows[0].name, "editor");
+        assert_eq!(workspace.windows[0].command, "nvim .");
+
+        assert_eq!(workspace.windows[1].name, "test");
+        assert_eq!(workspace.windows[1].command, "zsh");
+
+        assert_eq!(workspace.windows[2].name, "git");
+        assert_eq!(workspace.windows[2].command, "lazygit");
+    }
+}
