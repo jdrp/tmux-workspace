@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(workspace.name, "notes");
         assert_eq!(workspace.template, "blank");
         assert_eq!(workspace.root, "/home/test/notes");
-        
+
         assert_eq!(workspace.windows.len(), 1);
         assert_eq!(workspace.windows[0].name, "shell");
         assert_eq!(workspace.windows[0].command, "zsh");

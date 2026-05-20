@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::workspace::{Workspace, workspace_to_toml};
 
@@ -63,7 +63,7 @@ pub fn write_workspace_file(workspace: &Workspace) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-pub fn read_workspace_file(path: &PathBuf) -> Result<Workspace, String> {
+pub fn read_workspace_file(path: &Path) -> Result<Workspace, String> {
     let content =
         fs::read_to_string(path).map_err(|error| format!("failed to read file: {error}"))?;
 
