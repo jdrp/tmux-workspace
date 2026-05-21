@@ -49,7 +49,12 @@ enum Commands {
     Edit { name: String },
 
     #[command(about = "Create or attach to a tmux workspace session")]
-    Start { name: String },
+    Start {
+        name: String,
+
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 fn main() {
@@ -122,7 +127,7 @@ fn main() {
                 println!("{message}");
             }
         },
-        Commands::Start { name } => match start_workspace(&name) {
+        Commands::Start { name, dry_run } => match start_workspace(&name, dry_run) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");

@@ -109,8 +109,36 @@ fn attach_tmux_session(session_name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn start_workspace(name: &str) -> Result<(), String> {
+fn print_start_plan(workspace: &Workspace) {
+    println!("Would start workspace: {}", workspace.name);
+    println!("Root: {}", workspace.root);
+    println!();
+    println!("Commands:");
+
+    if let Some(first_window) = workspace.windows.first() {
+        println!(
+            "  tmux new-session -d -s {} -c {} -n {} '{}'",
+            workspace.name, workspace.root, first_window.name, first_window.command
+        );
+    }
+
+    for window in workspace.windows.iter().skip(1) {
+        println!(
+            "  tmux new-window -t {} -c {} -n {} '{}'",
+            workspace.name, workspace.root, window.name, window.command
+        );
+    }
+
+    println!("  tmux attach-session -t {}", workspace.name);
+}
+
+pub fn start_workspace(name: &str, dry_run: bool) -> Result<(), String> {
     let workspace = load_workspace(name)?;
+
+    if dry_run {
+        print_start_plan(&workspace);
+        return Ok(());
+    }
 
     check_tmux_exists()?;
 
