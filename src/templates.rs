@@ -34,7 +34,8 @@ fn blank_workspace(name: String, root: String) -> Workspace {
         root,
         windows: vec![Window {
             name: String::from("shell"),
-            command: String::from("zsh"),
+            command: Some(String::from("zsh")),
+            panes: Vec::new(),
         }],
     }
 }
@@ -47,15 +48,18 @@ fn rust_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
-                command: String::from("nvim ."),
+                command: Some(String::from("nvim .")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("test"),
-                command: String::from("zsh"),
+                command: Some(String::from("zsh")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
-                command: String::from("lazygit"),
+                command: Some(String::from("lazygit")),
+                panes: Vec::new(),
             },
         ],
     }
@@ -69,15 +73,18 @@ fn python_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
-                command: String::from("nvim ."),
+                command: Some(String::from("nvim .")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("run"),
-                command: String::from("zsh"),
+                command: Some(String::from("zsh")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
-                command: String::from("lazygit"),
+                command: Some(String::from("lazygit")),
+                panes: Vec::new(),
             },
         ],
     }
@@ -91,15 +98,18 @@ fn web_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
-                command: String::from("nvim ."),
+                command: Some(String::from("nvim .")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("server"),
-                command: String::from("npm run dev"),
+                command: Some(String::from("npm run dev")),
+                panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
-                command: String::from("lazygit"),
+                command: Some(String::from("lazygit")),
+                panes: Vec::new(),
             },
         ],
     }
@@ -132,7 +142,7 @@ mod tests {
 
         assert_eq!(workspace.windows.len(), 1);
         assert_eq!(workspace.windows[0].name, "shell");
-        assert_eq!(workspace.windows[0].command, "zsh");
+        assert_eq!(workspace.windows[0].command.as_deref(), Some("zsh"));
     }
 
     #[test]
@@ -150,12 +160,12 @@ mod tests {
         assert_eq!(workspace.windows.len(), 3);
 
         assert_eq!(workspace.windows[0].name, "editor");
-        assert_eq!(workspace.windows[0].command, "nvim .");
+        assert_eq!(workspace.windows[0].command.as_deref(), Some("nvim ."));
 
         assert_eq!(workspace.windows[1].name, "test");
-        assert_eq!(workspace.windows[1].command, "zsh");
+        assert_eq!(workspace.windows[1].command.as_deref(), Some("zsh"));
 
         assert_eq!(workspace.windows[2].name, "git");
-        assert_eq!(workspace.windows[2].command, "lazygit");
+        assert_eq!(workspace.windows[2].command.as_deref(), Some("lazygit"));
     }
 }

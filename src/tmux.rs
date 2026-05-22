@@ -27,7 +27,16 @@ fn tmux_session_exists(name: &str) -> Result<bool, String> {
     Ok(output.status.success())
 }
 
+fn window_command(window: &Window) -> Result<&str, String> {
+    window
+        .command
+        .as_deref()
+        .ok_or_else(|| format!("window '{}' has no command", window.name))
+}
+
 fn create_tmux_window(session_name: &str, root: &str, window: &Window) -> Result<(), String> {
+    let command = window_command(window)?;
+
     let output = Command::new("tmux")
         .arg("new-window")
         .arg("-t")
@@ -36,7 +45,7 @@ fn create_tmux_window(session_name: &str, root: &str, window: &Window) -> Result
         .arg(root)
         .arg("-n")
         .arg(&window.name)
-        .arg(&window.command)
+        .arg(command)
         .output()
         .map_err(|error| format!("failed to create tmux window: {error}"))?;
 
@@ -56,6 +65,8 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
         .first()
         .ok_or_else(|| String::from("workspace has no windows"))?;
 
+    let first_command = window_command(first_window)?;
+
     let output = Command::new("tmux")
         .arg("new-session")
         .arg("-d")
@@ -65,7 +76,7 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
         .arg(&workspace.root)
         .arg("-n")
         .arg(&first_window.name)
-        .arg(&first_window.command)
+        .arg(first_command)
         .output()
         .map_err(|error| format!("failed to create tmux session: {error}"))?;
 
@@ -116,16 +127,20 @@ fn print_start_plan(workspace: &Workspace) {
     println!("Commands:");
 
     if let Some(first_window) = workspace.windows.first() {
+        let command = first_window.command.as_deref().unwrap_or("<no command>");
+
         println!(
             "  tmux new-session -d -s {} -c {} -n {} '{}'",
-            workspace.name, workspace.root, first_window.name, first_window.command
+            workspace.name, workspace.root, first_window.name, command
         );
     }
 
     for window in workspace.windows.iter().skip(1) {
+        let command = window.command.as_deref().unwrap_or("<no command>");
+
         println!(
             "  tmux new-window -t {} -c {} -n {} '{}'",
-            workspace.name, workspace.root, window.name, window.command
+            workspace.name, workspace.root, window.name, command
         );
     }
 
