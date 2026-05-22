@@ -34,6 +34,7 @@ fn blank_workspace(name: String, root: String) -> Workspace {
         root,
         windows: vec![Window {
             name: String::from("shell"),
+            layout: None,
             command: Some(String::from("zsh")),
             panes: Vec::new(),
         }],
@@ -48,16 +49,19 @@ fn rust_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
+                layout: None,
                 command: Some(String::from("nvim .")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("test"),
+                layout: None,
                 command: Some(String::from("zsh")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
+                layout: None,
                 command: Some(String::from("lazygit")),
                 panes: Vec::new(),
             },
@@ -73,16 +77,19 @@ fn python_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
+                layout: None,
                 command: Some(String::from("nvim .")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("run"),
+                layout: None,
                 command: Some(String::from("zsh")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
+                layout: None,
                 command: Some(String::from("lazygit")),
                 panes: Vec::new(),
             },
@@ -98,16 +105,19 @@ fn web_workspace(name: String, root: String) -> Workspace {
         windows: vec![
             Window {
                 name: String::from("editor"),
+                layout: None,
                 command: Some(String::from("nvim .")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("server"),
+                layout: None,
                 command: Some(String::from("npm run dev")),
                 panes: Vec::new(),
             },
             Window {
                 name: String::from("git"),
+                layout: None,
                 command: Some(String::from("lazygit")),
                 panes: Vec::new(),
             },

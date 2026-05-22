@@ -8,9 +8,34 @@ pub struct Workspace {
     pub windows: Vec<Window>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Layout {
+    EvenHorizontal,
+    EvenVertical,
+    MainHorizontal,
+    MainVertical,
+    Tiled,
+}
+
+impl Layout {
+    pub fn tmux_name(self) -> &'static str {
+        match self {
+            Layout::EvenHorizontal => "even-horizontal",
+            Layout::EvenVertical => "even-vertical",
+            Layout::MainHorizontal => "main-horizontal",
+            Layout::MainVertical => "main-vertical",
+            Layout::Tiled => "tiled",
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct Window {
     pub name: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<Layout>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
@@ -36,6 +61,10 @@ pub fn print_workspace(workspace: &Workspace) {
             None => println!("  {}:", window.name),
         }
 
+        if let Some(layout) = window.layout {
+            println!("    layout: {}", layout.tmux_name());
+        }
+
         for pane in &window.panes {
             println!("    pane: {}", pane.command);
         }
@@ -59,11 +88,13 @@ mod tests {
             windows: vec![
                 Window {
                     name: String::from("editor"),
+                    layout: None,
                     command: Some(String::from("nvim .")),
                     panes: Vec::new(),
                 },
                 Window {
                     name: String::from("test"),
+                    layout: None,
                     command: Some(String::from("zsh")),
                     panes: Vec::new(),
                 },
@@ -88,11 +119,13 @@ mod tests {
             windows: vec![
                 Window {
                     name: String::from("editor"),
+                    layout: None,
                     command: Some(String::from("nvim .")),
                     panes: Vec::new(),
                 },
                 Window {
                     name: String::from("git"),
+                    layout: None,
                     command: Some(String::from("lazygit")),
                     panes: Vec::new(),
                 },
@@ -122,6 +155,7 @@ mod tests {
             root: String::from("/home/test/pane-demo"),
             windows: vec![Window {
                 name: String::from("dev"),
+                layout: Some(Layout::Tiled),
                 command: None,
                 panes: vec![
                     Pane {
@@ -137,6 +171,7 @@ mod tests {
         let toml = workspace_to_toml(&original).expect("workspace should serialize to TOML");
 
         assert!(toml.contains(r#"name = "pane-demo""#));
+        assert!(toml.contains(r#"layout = "tiled""#));
         assert!(toml.contains(r#"[[windows.panes]]"#));
         assert!(toml.contains(r#"command = "nvim .""#));
         assert!(toml.contains(r#"command = "cargo test""#));
@@ -144,6 +179,7 @@ mod tests {
         let parsed = toml::from_str::<Workspace>(&toml).expect("workspace TOML should parse back");
 
         assert_eq!(parsed.windows.len(), 1);
+        assert_eq!(parsed.windows[0].layout, Some(Layout::Tiled));
         assert_eq!(parsed.windows[0].name, "dev");
         assert_eq!(parsed.windows[0].command, None);
         assert_eq!(parsed.windows[0].panes.len(), 2);

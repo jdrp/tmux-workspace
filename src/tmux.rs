@@ -27,15 +27,68 @@ fn tmux_session_exists(name: &str) -> Result<bool, String> {
     Ok(output.status.success())
 }
 
-fn window_command(window: &Window) -> Result<&str, String> {
-    window
-        .command
-        .as_deref()
-        .ok_or_else(|| format!("window '{}' has no command", window.name))
+fn primary_window_command(window: &Window) -> Result<&str, String> {
+    if let Some(command) = window.command.as_deref() {
+        return Ok(command);
+    }
+
+    if let Some(first_pane) = window.panes.first() {
+        return Ok(first_pane.command.as_str());
+    }
+
+    Err(format!("window '{}' has no command or panes", window.name))
+}
+
+fn create_tmux_panes(session_name: &str, root: &str, window: &Window) -> Result<(), String> {
+    let start_index = if window.command.is_some() { 0 } else { 1 };
+
+    for pane in window.panes.iter().skip(start_index) {
+        let output = Command::new("tmux")
+            .arg("split-window")
+            .arg("-t")
+            .arg(format!("{}:{}", session_name, window.name))
+            .arg("-c")
+            .arg(root)
+            .arg(&pane.command)
+            .output()
+            .map_err(|error| format!("failed to create tmux pane: {error}"))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "tmux split-window failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn select_tmux_layout(session_name: &str, window: &Window) -> Result<(), String> {
+    let Some(layout) = window.layout else {
+        return Ok(());
+    };
+
+    let output = Command::new("tmux")
+        .arg("select-layout")
+        .arg("-t")
+        .arg(format!("{}:{}", session_name, window.name))
+        .arg(layout.tmux_name())
+        .output()
+        .map_err(|error| format!("failed to select tmux layout: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "tmux select-layout failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(())
 }
 
 fn create_tmux_window(session_name: &str, root: &str, window: &Window) -> Result<(), String> {
-    let command = window_command(window)?;
+    let command = primary_window_command(window)?;
 
     let output = Command::new("tmux")
         .arg("new-window")
@@ -56,6 +109,9 @@ fn create_tmux_window(session_name: &str, root: &str, window: &Window) -> Result
         ));
     }
 
+    create_tmux_panes(session_name, root, window)?;
+    select_tmux_layout(session_name, window)?;
+
     Ok(())
 }
 
@@ -65,7 +121,7 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
         .first()
         .ok_or_else(|| String::from("workspace has no windows"))?;
 
-    let first_command = window_command(first_window)?;
+    let first_command = primary_window_command(first_window)?;
 
     let output = Command::new("tmux")
         .arg("new-session")
@@ -86,6 +142,9 @@ fn create_tmux_session(workspace: &Workspace) -> Result<(), String> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
+
+    create_tmux_panes(&workspace.name, &workspace.root, first_window)?;
+    select_tmux_layout(&workspace.name, first_window)?;
 
     for window in workspace.windows.iter().skip(1) {
         create_tmux_window(&workspace.name, &workspace.root, window)?;
@@ -120,6 +179,26 @@ fn attach_tmux_session(session_name: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn print_pane_plan(session_name: &str, root: &str, window: &Window) {
+    let start_index = if window.command.is_some() { 0 } else { 1 };
+
+    for pane in window.panes.iter().skip(start_index) {
+        println!(
+            "  tmux split-window -t {}:{} -c {} '{}'",
+            session_name, window.name, root, pane.command
+        );
+    }
+
+    if let Some(layout) = window.layout {
+        println!(
+            "  tmux select-layout -t {}:{} {}",
+            session_name,
+            window.name,
+            layout.tmux_name()
+        );
+    }
+}
+
 fn print_start_plan(workspace: &Workspace) {
     println!("Would start workspace: {}", workspace.name);
     println!("Root: {}", workspace.root);
@@ -127,21 +206,25 @@ fn print_start_plan(workspace: &Workspace) {
     println!("Commands:");
 
     if let Some(first_window) = workspace.windows.first() {
-        let command = first_window.command.as_deref().unwrap_or("<no command>");
+        let command = primary_window_command(first_window).unwrap_or("<no command>");
 
         println!(
             "  tmux new-session -d -s {} -c {} -n {} '{}'",
             workspace.name, workspace.root, first_window.name, command
         );
+
+        print_pane_plan(&workspace.name, &workspace.root, first_window);
     }
 
     for window in workspace.windows.iter().skip(1) {
-        let command = window.command.as_deref().unwrap_or("<no command>");
+        let command = primary_window_command(window).unwrap_or("<no command>");
 
         println!(
             "  tmux new-window -t {} -c {} -n {} '{}'",
             workspace.name, workspace.root, window.name, command
         );
+
+        print_pane_plan(&workspace.name, &workspace.root, window);
     }
 
     println!("  tmux attach-session -t {}", workspace.name);
