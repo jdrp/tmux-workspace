@@ -9,43 +9,11 @@ tw init my-project --template rust --root .
 tw start my-project
 ```
 
-## What it does
-
-`tmux-workspace` stores workspace recipes as TOML files under:
+Workspace files are stored under:
 
 ```text
 ~/.config/tmux-workspace/workspaces/
 ```
-
-Each recipe defines:
-
-- a workspace name
-- a root directory
-- a template name
-- one or more tmux windows
-- the command to run in each window
-
-For example:
-
-```toml
-name = "tmux-workspace"
-template = "rust"
-root = "/home/user/dev/tmux-workspace"
-
-[[windows]]
-name = "editor"
-command = "nvim ."
-
-[[windows]]
-name = "test"
-command = "zsh"
-
-[[windows]]
-name = "git"
-command = "lazygit"
-```
-
-Running `tw start tmux-workspace` creates or switches to a tmux session with those windows.
 
 ## Features
 
@@ -54,9 +22,13 @@ Running `tw start tmux-workspace` creates or switches to a tmux session with tho
 - Show a workspace without starting tmux.
 - Edit a workspace TOML file with `$EDITOR`, falling back to `nvim`.
 - Start or attach to a tmux session from a workspace file.
+- Create tmux windows and panes from TOML.
+- Apply tmux layouts such as `tiled`, `main-vertical`, `main-horizontal`, `even-horizontal`, and `even-vertical`.
+- Send configured commands into interactive shells using `tmux send-keys`.
+- Keep panes open after commands finish.
 - Use `tmux switch-client` when already inside tmux to avoid nested sessions.
 - Use `tmux attach-session` when outside tmux.
-- Preview tmux commands with `--dry-run`.
+- Preview tmux actions with `--dry-run`.
 - Refuse to overwrite existing workspace files.
 - Store workspace roots as absolute paths.
 
@@ -238,7 +210,7 @@ tw start NAME
 Behavior:
 
 - If the tmux session already exists, `tw` switches or attaches to it.
-- If it does not exist, `tw` creates the session and windows from the TOML file.
+- If it does not exist, `tw` creates the session from the TOML file.
 - If running inside tmux, `tw` uses `tmux switch-client`.
 - If running outside tmux, `tw` uses `tmux attach-session`.
 
@@ -246,15 +218,6 @@ Example:
 
 ```bash
 tw start tmux-workspace
-```
-
-Equivalent shell idea:
-
-```bash
-tmux new-session -d -s tmux-workspace -c /home/user/dev/tmux-workspace -n editor 'nvim .'
-tmux new-window -t tmux-workspace -c /home/user/dev/tmux-workspace -n test 'zsh'
-tmux new-window -t tmux-workspace -c /home/user/dev/tmux-workspace -n git 'lazygit'
-tmux attach-session -t tmux-workspace
 ```
 
 ### Dry run
@@ -265,17 +228,115 @@ Preview what `start` would do without creating or attaching to a tmux session:
 tw start NAME --dry-run
 ```
 
-Example output:
+## Workspace TOML
+
+A workspace file defines a tmux session.
+
+Simple workspace:
+
+```toml
+name = "tmux-workspace"
+template = "rust"
+root = "/home/user/dev/tmux-workspace"
+
+[[windows]]
+name = "editor"
+command = "nvim ."
+
+[[windows]]
+name = "test"
+command = "zsh"
+
+[[windows]]
+name = "git"
+command = "lazygit"
+```
+
+Running `tw start tmux-workspace` creates or switches to a tmux session with those windows.
+
+### Panes
+
+Windows can also define panes.
+
+Pane support is useful for long-running development processes, such as a full-stack app with an editor, backend server, frontend server, and Git UI.
+
+```toml
+name = "fullstack-app"
+template = "custom"
+root = "/home/user/dev/fullstack-app"
+
+[[windows]]
+name = "dev"
+layout = "main-vertical"
+
+[[windows.panes]]
+command = "nvim ."
+
+[[windows.panes]]
+command = "cd backend; cargo run"
+
+[[windows.panes]]
+command = "cd frontend; npm run dev"
+
+[[windows]]
+name = "git"
+command = "lazygit"
+```
+
+This opens Neovim in the `dev` window, starts backend and frontend dev servers in panes, and opens LazyGit in a separate `git` window.
+
+Configured commands are sent into interactive shells using `tmux send-keys`. This means that when a command exits, the pane remains open and returns to the shell.
+
+Because commands are sent to a shell, normal shell syntax works:
+
+```toml
+command = "cd backend; cargo run"
+```
+
+### Layouts
+
+A window can optionally request a tmux layout:
+
+```toml
+[[windows]]
+name = "dev"
+layout = "tiled"
+```
+
+Supported layouts:
 
 ```text
-Would start workspace: tmux-workspace
-Root: /home/user/dev/tmux-workspace
+even-horizontal
+even-vertical
+main-horizontal
+main-vertical
+tiled
+```
 
-Commands:
-  tmux new-session -d -s tmux-workspace -c /home/user/dev/tmux-workspace -n editor 'nvim .'
-  tmux new-window -t tmux-workspace -c /home/user/dev/tmux-workspace -n test 'zsh'
-  tmux new-window -t tmux-workspace -c /home/user/dev/tmux-workspace -n git 'lazygit'
-  tmux attach-session -t tmux-workspace
+Layouts are applied with `tmux select-layout` after panes are created.
+
+For example, a four-pane dashboard can use `layout = "tiled"`:
+
+```toml
+name = "dashboard"
+template = "custom"
+root = "/home/user/dev/app"
+
+[[windows]]
+name = "dev"
+layout = "tiled"
+
+[[windows.panes]]
+command = "nvim ."
+
+[[windows.panes]]
+command = "cd backend; cargo run"
+
+[[windows.panes]]
+command = "cd frontend; npm run dev"
+
+[[windows.panes]]
+command = "lazygit"
 ```
 
 ## Commands
@@ -317,7 +378,7 @@ cargo install --path .
 
 ## Project status
 
-The core MVP is implemented:
+Implemented:
 
 - `init`
 - `list`
@@ -327,6 +388,9 @@ The core MVP is implemented:
 - built-in templates
 - TOML serialization and parsing
 - tmux session creation and attachment
+- tmux window support
+- tmux pane support
+- optional tmux layouts
 - `start --dry-run`
 
 The project is still early and mainly built for personal workflow and Rust learning.
@@ -335,16 +399,17 @@ The project is still early and mainly built for personal workflow and Rust learn
 
 Planned or possible improvements:
 
+- Text user interface for browsing and starting workspaces
 - Better error types with `anyhow` or `thiserror`
 - More validation for workspace files
 - More tests for storage, path handling, and tmux command planning
 - Shell completions
-- Pane support in TOML
 - Project-specific environment variables
 - Workspace groups
 - Import layout from an existing tmux session
 - User-defined templates
 - Optional Git branch or status display in `tw list`
+- More deterministic pane layout support
 - Bootstrap commands for creating projects, explicitly kept out of the MVP
 
 ## Non-goals for the MVP
@@ -352,14 +417,11 @@ Planned or possible improvements:
 The MVP does not aim to include:
 
 - project bootstrap commands
-- pane layouts
 - plugin systems
 - remote sessions
-- a TUI
 - automatic GitHub repository creation
 - cross-platform support beyond Unix-like systems
 
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
