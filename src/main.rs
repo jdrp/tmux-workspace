@@ -2,6 +2,7 @@ mod editor;
 mod storage;
 mod templates;
 mod tmux;
+mod tui;
 mod workspace;
 
 use clap::{Parser, Subcommand};
@@ -20,7 +21,7 @@ use crate::workspace::print_workspace;
 #[command(about = "Launch repeatable tmux workspaces from TOML files")]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -61,12 +62,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init {
+        Some(Commands::Init {
             name,
             template,
             root,
             edit,
-        } => {
+        }) => {
             let root = match normalize_root(&root) {
                 Ok(root) => root,
                 Err(message) => {
@@ -99,7 +100,7 @@ fn main() {
                 }
             }
         }
-        Commands::List => {
+        Some(Commands::List) => {
             let workspaces = match list_workspaces() {
                 Ok(workspaces) => workspaces,
                 Err(message) => {
@@ -110,7 +111,7 @@ fn main() {
 
             print_workspace_list(&workspaces);
         }
-        Commands::Show { name } => {
+        Some(Commands::Show { name }) => {
             let workspace = match load_workspace(&name) {
                 Ok(workspace) => workspace,
                 Err(message) => {
@@ -121,17 +122,22 @@ fn main() {
 
             print_workspace(&workspace);
         }
-        Commands::Edit { name } => match edit_workspace(&name) {
+        Some(Commands::Edit { name }) => match edit_workspace(&name) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");
             }
         },
-        Commands::Start { name, dry_run } => match start_workspace(&name, dry_run) {
+        Some(Commands::Start { name, dry_run }) => match start_workspace(&name, dry_run) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");
             }
         },
+        None => {
+            if let Err(message) = tui::run() {
+                println!("{message}");
+            }
+        }
     }
 }
