@@ -7,8 +7,14 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use crate::workspace::Workspace;
 use crate::storage::list_workspaces;
+use crate::workspace::Workspace;
+
+pub enum TuiAction {
+    Start(String),
+    Edit(String),
+    Quit,
+}
 
 struct App {
     workspaces: Vec<Workspace>,
@@ -64,7 +70,7 @@ impl App {
     }
 }
 
-pub fn run() -> Result<Option<String>, String> {
+pub fn run() -> Result<TuiAction, String> {
     let mut terminal =
         ratatui::try_init().map_err(|error| format!("failed to initialize TUI: {error}"))?;
 
@@ -76,7 +82,7 @@ pub fn run() -> Result<Option<String>, String> {
     result
 }
 
-fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<Option<String>, String> {
+fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, String> {
     loop {
         terminal
             .draw(|frame| render(frame, app))
@@ -90,12 +96,17 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<Option<Strin
             }
 
             match key.code {
-                KeyCode::Char('q') => return Ok(None),
+                KeyCode::Char('q') => return Ok(TuiAction::Quit),
                 KeyCode::Char('j') | KeyCode::Down => app.next(),
                 KeyCode::Char('k') | KeyCode::Up => app.previous(),
                 KeyCode::Enter => {
                     if let Some(workspace) = app.selected_workspace() {
-                        return Ok(Some(workspace.name.clone()));
+                        return Ok(TuiAction::Start(workspace.name.clone()));
+                    }
+                }
+                KeyCode::Char('e') => {
+                    if let Some(workspace) = app.selected_workspace() {
+                        return Ok(TuiAction::Edit(workspace.name.clone()));
                     }
                 }
                 _ => {}
@@ -188,7 +199,7 @@ fn workspace_details_text(workspace: &Workspace) -> String {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
-    let footer = Paragraph::new(Line::from("↑/↓ j/k move   Enter start   q quit"))
+    let footer = Paragraph::new(Line::from("↑/↓ j/k move   Enter start   e edit   q quit"))
         .block(Block::default().borders(Borders::ALL));
 
     frame.render_widget(footer, area);

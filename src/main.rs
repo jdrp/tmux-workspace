@@ -13,6 +13,7 @@ use crate::storage::{
 };
 use crate::templates::{Template, build_workspace};
 use crate::tmux::start_workspace;
+use crate::tui::TuiAction;
 use crate::workspace::print_workspace;
 
 #[derive(Parser)]
@@ -140,12 +141,17 @@ fn main() {
         },
 
         None => match tui::run() {
-            Ok(Some(name)) => {
+            Ok(TuiAction::Start(name)) => {
                 if let Err(message) = start_workspace(&name, false) {
                     println!("{message}");
                 }
             }
-            Ok(None) => {}
+            Ok(TuiAction::Edit(name)) => {
+                if let Err(message) = edit_workspace(&name) {
+                    println!("{message}");
+                }
+            }
+            Ok(TuiAction::Quit) => {}
             Err(message) => {
                 println!("{message}");
             }
