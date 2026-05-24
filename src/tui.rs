@@ -7,8 +7,8 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use crate::storage::list_workspaces;
 use crate::workspace::Workspace;
+use crate::storage::list_workspaces;
 
 struct App {
     workspaces: Vec<Workspace>,
@@ -64,7 +64,7 @@ impl App {
     }
 }
 
-pub fn run() -> Result<(), String> {
+pub fn run() -> Result<Option<String>, String> {
     let mut terminal =
         ratatui::try_init().map_err(|error| format!("failed to initialize TUI: {error}"))?;
 
@@ -76,7 +76,7 @@ pub fn run() -> Result<(), String> {
     result
 }
 
-fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<(), String> {
+fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<Option<String>, String> {
     loop {
         terminal
             .draw(|frame| render(frame, app))
@@ -90,9 +90,14 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<(), String> 
             }
 
             match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                KeyCode::Char('q') => return Ok(None),
                 KeyCode::Char('j') | KeyCode::Down => app.next(),
                 KeyCode::Char('k') | KeyCode::Up => app.previous(),
+                KeyCode::Enter => {
+                    if let Some(workspace) = app.selected_workspace() {
+                        return Ok(Some(workspace.name.clone()));
+                    }
+                }
                 _ => {}
             }
         }
@@ -183,7 +188,7 @@ fn workspace_details_text(workspace: &Workspace) -> String {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
-    let footer = Paragraph::new(Line::from("↑/↓ j/k move   q/Esc quit"))
+    let footer = Paragraph::new(Line::from("↑/↓ j/k move   Enter start   q quit"))
         .block(Block::default().borders(Borders::ALL));
 
     frame.render_widget(footer, area);

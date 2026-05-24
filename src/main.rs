@@ -30,7 +30,7 @@ enum Commands {
     Init {
         name: String,
 
-        #[arg(long, value_enum, default_value_t = Template::Blank)]
+        #[arg(long, value_enum, default_value_t = Template::Custom)]
         template: Template,
 
         #[arg(long, default_value = ".")]
@@ -100,6 +100,7 @@ fn main() {
                 }
             }
         }
+
         Some(Commands::List) => {
             let workspaces = match list_workspaces() {
                 Ok(workspaces) => workspaces,
@@ -111,6 +112,7 @@ fn main() {
 
             print_workspace_list(&workspaces);
         }
+
         Some(Commands::Show { name }) => {
             let workspace = match load_workspace(&name) {
                 Ok(workspace) => workspace,
@@ -122,22 +124,31 @@ fn main() {
 
             print_workspace(&workspace);
         }
+
         Some(Commands::Edit { name }) => match edit_workspace(&name) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");
             }
         },
+
         Some(Commands::Start { name, dry_run }) => match start_workspace(&name, dry_run) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");
             }
         },
-        None => {
-            if let Err(message) = tui::run() {
+
+        None => match tui::run() {
+            Ok(Some(name)) => {
+                if let Err(message) = start_workspace(&name, false) {
+                    println!("{message}");
+                }
+            }
+            Ok(None) => {}
+            Err(message) => {
                 println!("{message}");
             }
-        }
+        },
     }
 }

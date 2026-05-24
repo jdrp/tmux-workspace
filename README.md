@@ -87,7 +87,7 @@ tw init NAME
 
 By default, this uses:
 
-- template: `blank`
+- template: `custom`
 - root: current directory
 - edit: false
 
@@ -107,13 +107,13 @@ Existing workspace files are not overwritten.
 ### Available templates
 
 ```text
-blank
+custom
 rust
 python
 web
 ```
 
-#### `blank`
+#### `custom`
 
 ```text
 shell    zsh
@@ -153,7 +153,7 @@ Example output:
 
 ```text
 tmux-workspace    rust      /home/user/dev/tmux-workspace
-notes             blank     /home/user/notes
+notes             custom     /home/user/notes
 portfolio         web       /home/user/dev/portfolio
 ```
 
