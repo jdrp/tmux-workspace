@@ -9,9 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 };
 
+use crate::storage::{delete_workspace_file, list_workspaces};
 use crate::tmux::tmux_session_exists;
 use crate::workspace::Workspace;
-use crate::storage::{delete_workspace_file, list_workspaces};
 
 pub enum TuiAction {
     Start(String),
@@ -29,6 +29,7 @@ struct App {
     pending_delete: Option<String>,
     message: Option<String>,
     running_sessions: HashSet<String>,
+    show_help: bool,
 }
 
 impl App {
@@ -52,6 +53,7 @@ impl App {
             pending_delete: None,
             message: None,
             running_sessions: HashSet::new(),
+            show_help: false,
         };
 
         app.refresh_running_sessions();
@@ -190,6 +192,17 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
                 continue;
             }
 
+            if app.show_help {
+                match key.code {
+                    KeyCode::Char('?') | KeyCode::Esc | KeyCode::Char('q') => {
+                        app.show_help = false;
+                    }
+                    _ => {}
+                }
+
+                continue;
+            }
+
             if app.pending_delete.is_some() {
                 match key.code {
                     KeyCode::Char('y') => {
@@ -230,6 +243,7 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
 
             match key.code {
                 KeyCode::Char('q') => return Ok(TuiAction::Quit),
+                KeyCode::Char('?') => app.show_help = true,
                 KeyCode::Char('j') | KeyCode::Down => app.next(),
                 KeyCode::Char('k') | KeyCode::Up => app.previous(),
                 KeyCode::Char('r') => app.refresh()?,
@@ -294,6 +308,38 @@ fn render_delete_popup(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(popup, popup_area);
 }
 
+fn render_help_popup(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.show_help {
+        return;
+    }
+
+    let popup_area = centered_rect(64, 15, area);
+
+    let text = vec![
+        Line::from("Navigation"),
+        Line::from("  j / Down       move down"),
+        Line::from("  k / Up         move up"),
+        Line::from(""),
+        Line::from("Actions"),
+        Line::from("  Enter          start or switch to workspace"),
+        Line::from("  e              edit workspace TOML"),
+        Line::from("  d              delete workspace TOML"),
+        Line::from("  r              refresh workspaces"),
+        Line::from("  /              search"),
+        Line::from("  Esc            clear search"),
+        Line::from(""),
+        Line::from("  q              quit"),
+        Line::from("  ? / Esc        close help"),
+    ];
+
+    let popup = Paragraph::new(text)
+        .block(Block::default().title(" Help ").borders(Borders::ALL))
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(popup, popup_area);
+}
+
 fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
@@ -311,6 +357,7 @@ fn render(frame: &mut Frame, app: &mut App) {
     render_workspace_details(frame, app, main_chunks[1]);
     render_footer(frame, app, vertical_chunks[1]);
     render_delete_popup(frame, app, area);
+    render_help_popup(frame, app, area);
 }
 
 fn render_workspace_list(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -416,9 +463,9 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let keybinds = if app.search_mode {
         "Esc clear  "
     } else if app.search.is_empty() {
-        "↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   q quit  "
+        "↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   ? help   q quit  "
     } else {
-        "Esc clear   ↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   q quit  "
+        "Esc clear   ↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   ? help   q quit  "
     };
 
     let left_footer = Paragraph::new(Line::from(search_text));
