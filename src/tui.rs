@@ -1,13 +1,14 @@
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use crate::storage::list_workspaces;
+use crate::storage::{list_workspaces, delete_workspace_file};
 use crate::workspace::Workspace;
 
 pub enum TuiAction {
@@ -23,6 +24,8 @@ struct App {
     list_state: ListState,
     search: String,
     search_mode: bool,
+    pending_delete: Option<String>,
+    message: Option<String>,
 }
 
 impl App {
@@ -43,6 +46,8 @@ impl App {
             list_state,
             search: String::new(),
             search_mode: false,
+            pending_delete: None,
+            message: None,
         })
     }
 
@@ -110,6 +115,28 @@ impl App {
 
         self.sync_list_state();
     }
+
+    fn request_delete_selected(&mut self) {
+        if let Some(workspace) = self.selected_workspace() {
+            self.pending_delete = Some(workspace.name.clone());
+        }
+    }
+
+    fn confirm_delete(&mut self) -> Result<(), String> {
+        let Some(name) = self.pending_delete.take() else {
+            return Ok(());
+        };
+
+        let path = delete_workspace_file(&name)?;
+        self.message = Some(format!("Deleted {}", path.display()));
+        self.refresh()?;
+
+        Ok(())
+    }
+
+    fn cancel_delete(&mut self) {
+        self.pending_delete = None;
+    }
 }
 
 pub fn run() -> Result<TuiAction, String> {
@@ -134,6 +161,20 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
 
         if let Event::Key(key) = event {
             if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
+            if app.pending_delete.is_some() {
+                match key.code {
+                    KeyCode::Char('y') => {
+                        app.confirm_delete()?;
+                    }
+                    KeyCode::Char('n') | KeyCode::Esc => {
+                        app.cancel_delete();
+                    }
+                    _ => {}
+                }
+
                 continue;
             }
 
@@ -166,9 +207,8 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
                 KeyCode::Char('j') | KeyCode::Down => app.next(),
                 KeyCode::Char('k') | KeyCode::Up => app.previous(),
                 KeyCode::Char('r') => app.refresh()?,
-                KeyCode::Char('/') => {
-                    app.search_mode = true;
-                }
+                KeyCode::Char('d') => app.request_delete_selected(),
+                KeyCode::Char('/') => app.search_mode = true,
                 KeyCode::Esc => {
                     app.search_mode = false;
                     app.search.clear();
@@ -190,6 +230,40 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
     }
 }
 
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    let width = width.min(area.width.saturating_sub(4));
+    let height = height.min(area.height.saturating_sub(4));
+
+    let x = area.x + area.width.saturating_sub(width) / 2;
+    let y = area.y + area.height.saturating_sub(height) / 2;
+
+    Rect {
+        x,
+        y,
+        width,
+        height,
+    }
+}
+
+fn render_delete_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(name) = &app.pending_delete else  {
+        return;
+    };
+
+    let popup_area = centered_rect(58, 9, area);
+
+    let text = format!(
+        "Delete workspace '{name}'?\n\nThis will remove its TOML file.\nThe tmux session will not be killed.\n\n y confirm   n/Esc cancel"
+    );
+
+    let popup = Paragraph::new(text)
+        .block(Block::default().title("Delete workspace").borders(Borders::ALL))
+        .wrap(Wrap { trim: false });
+    
+    frame.render_widget(Clear, popup_area);
+    frame.render_widget(popup, popup_area);
+}
+
 fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
@@ -206,6 +280,7 @@ fn render(frame: &mut Frame, app: &mut App) {
     render_workspace_list(frame, app, main_chunks[0]);
     render_workspace_details(frame, app, main_chunks[1]);
     render_footer(frame, app, vertical_chunks[1]);
+    render_delete_popup(frame, app, area);
 }
 
 fn render_workspace_list(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -298,9 +373,9 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let keybinds = if app.search_mode {
         "Esc clear  "
     } else if app.search.is_empty() {
-        "↑/↓ j/k move   Enter start   e edit   r refresh   / search   q quit  "
+        "↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   q quit  "
     } else {
-        "Esc clear   ↑/↓ j/k move   Enter start   e edit   r refresh   / search   q quit  "
+        "Esc clear   ↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   q quit  "
     };
 
     let left_footer = Paragraph::new(Line::from(search_text));
