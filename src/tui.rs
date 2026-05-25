@@ -1,4 +1,5 @@
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use std::collections::HashSet;
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -8,8 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use crate::storage::{list_workspaces, delete_workspace_file};
+use crate::tmux::tmux_session_exists;
 use crate::workspace::Workspace;
+use crate::storage::{delete_workspace_file, list_workspaces};
 
 pub enum TuiAction {
     Start(String),
@@ -26,6 +28,7 @@ struct App {
     search_mode: bool,
     pending_delete: Option<String>,
     message: Option<String>,
+    running_sessions: HashSet<String>,
 }
 
 impl App {
@@ -39,7 +42,7 @@ impl App {
             list_state.select(Some(selected));
         }
 
-        Ok(Self {
+        let mut app = Self {
             workspaces,
             filtered_indices,
             selected,
@@ -48,7 +51,11 @@ impl App {
             search_mode: false,
             pending_delete: None,
             message: None,
-        })
+            running_sessions: HashSet::new(),
+        };
+
+        app.refresh_running_sessions();
+        Ok(app)
     }
 
     fn selected_workspace(&self) -> Option<&Workspace> {
@@ -83,8 +90,27 @@ impl App {
         }
     }
 
+    fn refresh_running_sessions(&mut self) {
+        self.running_sessions.clear();
+
+        for workspace in &self.workspaces {
+            match tmux_session_exists(&workspace.name) {
+                Ok(true) => {
+                    self.running_sessions.insert(workspace.name.clone());
+                }
+                Ok(false) => {}
+                Err(_) => {}
+            }
+        }
+    }
+
+    fn is_running(&self, workspace: &Workspace) -> bool {
+        self.running_sessions.contains(&workspace.name)
+    }
+
     fn refresh(&mut self) -> Result<(), String> {
         self.workspaces = list_workspaces()?;
+        self.refresh_running_sessions();
         self.apply_filter();
 
         Ok(())
@@ -246,7 +272,7 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
 }
 
 fn render_delete_popup(frame: &mut Frame, app: &App, area: Rect) {
-    let Some(name) = &app.pending_delete else  {
+    let Some(name) = &app.pending_delete else {
         return;
     };
 
@@ -257,9 +283,13 @@ fn render_delete_popup(frame: &mut Frame, app: &App, area: Rect) {
     );
 
     let popup = Paragraph::new(text)
-        .block(Block::default().title("Delete workspace").borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title("Delete workspace")
+                .borders(Borders::ALL),
+        )
         .wrap(Wrap { trim: false });
-    
+
     frame.render_widget(Clear, popup_area);
     frame.render_widget(popup, popup_area);
 }
@@ -293,7 +323,15 @@ fn render_workspace_list(frame: &mut Frame, app: &mut App, area: Rect) {
             .iter()
             .filter_map(|&workspace_index| app.workspaces.get(workspace_index))
             .map(|workspace| {
-                ListItem::new(format!("{:<20} {}", workspace.name, workspace.template))
+                let status = if app.is_running(workspace) {
+                    "●"
+                } else {
+                    "○"
+                };
+                ListItem::new(format!(
+                    "{:<20} {:<10} {}",
+                    workspace.name, workspace.template, status
+                ))
             })
             .collect()
     };
@@ -308,7 +346,10 @@ fn render_workspace_list(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_workspace_details(frame: &mut Frame, app: &App, area: Rect) {
     let text = match app.selected_workspace() {
-        Some(workspace) => workspace_details_text(workspace),
+        Some(workspace) => {
+            let running = app.is_running(workspace);
+            workspace_details_text(workspace, running)
+        }
         None => String::from(
             "No workspaces found.\n\nCreate one with:\n\n  tw init my-project --template rust --root .",
         ),
@@ -321,12 +362,14 @@ fn render_workspace_details(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(details, area);
 }
 
-fn workspace_details_text(workspace: &Workspace) -> String {
+fn workspace_details_text(workspace: &Workspace, running: bool) -> String {
     let mut text = String::new();
+    let session = if running { "running" } else { "stopped" };
 
     text.push_str(&format!("name: {}\n\n", workspace.name));
     text.push_str(&format!("template: {}\n\n", workspace.template));
     text.push_str(&format!("root: {}\n\n", workspace.root));
+    text.push_str(&format!("session: {}\n\n", session));
     text.push_str("windows:\n");
 
     for window in &workspace.windows {

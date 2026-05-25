@@ -77,8 +77,7 @@ pub fn delete_workspace_file(name: &str) -> Result<PathBuf, String> {
         return Err(format!("workspace not found: {}", path.display()));
     }
 
-    fs::remove_file(&path)
-        .map_err(|error| format!("failed to delete workspace file: {error}"))?;
+    fs::remove_file(&path).map_err(|error| format!("failed to delete workspace file: {error}"))?;
 
     Ok(path)
 }
