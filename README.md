@@ -1,11 +1,16 @@
 # tmux-workspace
 
-`tmux-workspace` is a small Rust CLI for creating and launching repeatable tmux workspaces from TOML files.
+`tmux-workspace` is a small Rust CLI and TUI for creating, browsing, and launching repeatable tmux workspaces from TOML files.
 
 Define a workspace once, then reopen the same tmux session layout whenever you need it.
 
 ```bash
-tw init my-project --template rust --root .
+tw
+```
+
+or start a workspace directly:
+
+```bash
 tw start my-project
 ```
 
@@ -17,8 +22,11 @@ Workspace files are stored under:
 
 ## Features
 
+- Open an interactive TUI with `tw`.
+- Browse, search, start, edit, refresh, and delete workspaces from the TUI.
+- Show whether a tmux session is currently running.
 - Create workspace TOML files from built-in templates.
-- List available workspaces.
+- List available workspaces from the CLI.
 - Show a workspace without starting tmux.
 - Edit a workspace TOML file with `$EDITOR`, falling back to `nvim`.
 - Start or attach to a tmux session from a workspace file.
@@ -44,7 +52,7 @@ Workspace files are stored under:
 ### From a local clone
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/jdrp/tmux-workspace.git
 cd tmux-workspace
 cargo install --path .
 ```
@@ -75,9 +83,35 @@ You can also run the CLI without installing it:
 ```bash
 cargo run --bin tw -- --help
 cargo run --bin tw -- list
+cargo run --bin tw --
 ```
 
 ## Usage
+
+### Open the TUI
+
+```bash
+tw
+```
+
+This opens the interactive workspace browser.
+
+Keybindings:
+
+```text
+j / Down     move down
+k / Up       move up
+Enter        start or switch to the selected workspace
+e            edit the selected workspace TOML
+d            delete the selected workspace TOML after confirmation
+r            refresh workspaces and tmux session status
+/            search workspaces
+Esc          clear search or close the active popup
+?            show help
+q            quit
+```
+
+Deleting a workspace from the TUI removes only the TOML file. It does not kill an existing tmux session.
 
 ### Create a workspace
 
@@ -87,7 +121,7 @@ tw init NAME
 
 By default, this uses:
 
-- template: `blank`
+- template: `custom`
 - root: current directory
 - edit: false
 
@@ -107,13 +141,13 @@ Existing workspace files are not overwritten.
 ### Available templates
 
 ```text
-blank
+custom
 rust
 python
 web
 ```
 
-#### `blank`
+#### `custom`
 
 ```text
 shell    zsh
@@ -153,7 +187,7 @@ Example output:
 
 ```text
 tmux-workspace    rust      /home/user/dev/tmux-workspace
-notes             blank     /home/user/notes
+notes             custom    /home/user/notes
 portfolio         web       /home/user/dev/portfolio
 ```
 
@@ -342,6 +376,7 @@ command = "lazygit"
 ## Commands
 
 ```text
+tw
 tw init NAME [--template TEMPLATE] [--root PATH] [--edit]
 tw list
 tw show NAME
@@ -364,6 +399,7 @@ Run locally:
 
 ```bash
 cargo run --bin tw -- --help
+cargo run --bin tw --
 cargo run --bin tw -- init demo --template rust --root .
 cargo run --bin tw -- list
 cargo run --bin tw -- show demo
@@ -380,6 +416,8 @@ cargo install --path .
 
 Implemented:
 
+- TUI workspace browser
+- TUI search, refresh, help, edit, start, and delete actions
 - `init`
 - `list`
 - `show`
@@ -399,7 +437,11 @@ The project is still early and mainly built for personal workflow and Rust learn
 
 Planned or possible improvements:
 
-- Text user interface for browsing and starting workspaces
+- Create workspaces from the TUI
+- Edit workspaces visually from the TUI
+- Save an existing workspace as a reusable template
+- Move user-defined templates to TOML files
+- Sort workspaces by name or most recent update
 - Better error types with `anyhow` or `thiserror`
 - More validation for workspace files
 - More tests for storage, path handling, and tmux command planning
@@ -407,7 +449,6 @@ Planned or possible improvements:
 - Project-specific environment variables
 - Workspace groups
 - Import layout from an existing tmux session
-- User-defined templates
 - Optional Git branch or status display in `tw list`
 - More deterministic pane layout support
 - Bootstrap commands for creating projects, explicitly kept out of the MVP

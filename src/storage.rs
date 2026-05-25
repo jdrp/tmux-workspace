@@ -70,6 +70,18 @@ pub fn read_workspace_file(path: &Path) -> Result<Workspace, String> {
     toml::from_str::<Workspace>(&content).map_err(|error| format!("failed to parse TOML: {error}"))
 }
 
+pub fn delete_workspace_file(name: &str) -> Result<PathBuf, String> {
+    let path = workspace_file_path(name);
+
+    if !path.exists() {
+        return Err(format!("workspace not found: {}", path.display()));
+    }
+
+    fs::remove_file(&path).map_err(|error| format!("failed to delete workspace file: {error}"))?;
+
+    Ok(path)
+}
+
 pub fn list_workspaces() -> Result<Vec<Workspace>, String> {
     let dir = workspaces_dir();
 

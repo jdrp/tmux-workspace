@@ -2,6 +2,7 @@ mod editor;
 mod storage;
 mod templates;
 mod tmux;
+mod tui;
 mod workspace;
 
 use clap::{Parser, Subcommand};
@@ -12,6 +13,7 @@ use crate::storage::{
 };
 use crate::templates::{Template, build_workspace};
 use crate::tmux::start_workspace;
+use crate::tui::TuiAction;
 use crate::workspace::print_workspace;
 
 #[derive(Parser)]
@@ -20,7 +22,7 @@ use crate::workspace::print_workspace;
 #[command(about = "Launch repeatable tmux workspaces from TOML files")]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -29,7 +31,7 @@ enum Commands {
     Init {
         name: String,
 
-        #[arg(long, value_enum, default_value_t = Template::Blank)]
+        #[arg(long, value_enum, default_value_t = Template::Custom)]
         template: Template,
 
         #[arg(long, default_value = ".")]
@@ -61,12 +63,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init {
+        Some(Commands::Init {
             name,
             template,
             root,
             edit,
-        } => {
+        }) => {
             let root = match normalize_root(&root) {
                 Ok(root) => root,
                 Err(message) => {
@@ -99,7 +101,8 @@ fn main() {
                 }
             }
         }
-        Commands::List => {
+
+        Some(Commands::List) => {
             let workspaces = match list_workspaces() {
                 Ok(workspaces) => workspaces,
                 Err(message) => {
@@ -110,7 +113,8 @@ fn main() {
 
             print_workspace_list(&workspaces);
         }
-        Commands::Show { name } => {
+
+        Some(Commands::Show { name }) => {
             let workspace = match load_workspace(&name) {
                 Ok(workspace) => workspace,
                 Err(message) => {
@@ -121,14 +125,33 @@ fn main() {
 
             print_workspace(&workspace);
         }
-        Commands::Edit { name } => match edit_workspace(&name) {
+
+        Some(Commands::Edit { name }) => match edit_workspace(&name) {
             Ok(()) => {}
             Err(message) => {
                 println!("{message}");
             }
         },
-        Commands::Start { name, dry_run } => match start_workspace(&name, dry_run) {
+
+        Some(Commands::Start { name, dry_run }) => match start_workspace(&name, dry_run) {
             Ok(()) => {}
+            Err(message) => {
+                println!("{message}");
+            }
+        },
+
+        None => match tui::run() {
+            Ok(TuiAction::Start(name)) => {
+                if let Err(message) = start_workspace(&name, false) {
+                    println!("{message}");
+                }
+            }
+            Ok(TuiAction::Edit(name)) => {
+                if let Err(message) = edit_workspace(&name) {
+                    println!("{message}");
+                }
+            }
+            Ok(TuiAction::Quit) => {}
             Err(message) => {
                 println!("{message}");
             }

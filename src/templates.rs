@@ -4,7 +4,7 @@ use crate::workspace::{Window, Workspace};
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Template {
-    Blank,
+    Custom,
     Rust,
     Python,
     Web,
@@ -13,7 +13,7 @@ pub enum Template {
 impl Template {
     pub fn as_str(self) -> &'static str {
         match self {
-            Template::Blank => "blank",
+            Template::Custom => "custom",
             Template::Rust => "rust",
             Template::Python => "python",
             Template::Web => "web",
@@ -27,10 +27,10 @@ impl std::fmt::Display for Template {
     }
 }
 
-fn blank_workspace(name: String, root: String) -> Workspace {
+fn custom_workspace(name: String, root: String) -> Workspace {
     Workspace {
         name,
-        template: Template::Blank.as_str().to_string(),
+        template: Template::Custom.as_str().to_string(),
         root,
         windows: vec![Window {
             name: String::from("shell"),
@@ -127,7 +127,7 @@ fn web_workspace(name: String, root: String) -> Workspace {
 
 pub fn build_workspace(template: Template, name: String, root: String) -> Workspace {
     match template {
-        Template::Blank => blank_workspace(name, root),
+        Template::Custom => custom_workspace(name, root),
         Template::Rust => rust_workspace(name, root),
         Template::Python => python_workspace(name, root),
         Template::Web => web_workspace(name, root),
@@ -139,15 +139,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn blank_template_creates_shell_window() {
+    fn custom_template_creates_shell_window() {
         let workspace = build_workspace(
-            Template::Blank,
+            Template::Custom,
             String::from("notes"),
             String::from("/home/test/notes"),
         );
 
         assert_eq!(workspace.name, "notes");
-        assert_eq!(workspace.template, "blank");
+        assert_eq!(workspace.template, "custom");
         assert_eq!(workspace.root, "/home/test/notes");
 
         assert_eq!(workspace.windows.len(), 1);

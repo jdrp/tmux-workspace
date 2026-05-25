@@ -16,7 +16,7 @@ fn check_tmux_exists() -> Result<(), String> {
     Ok(())
 }
 
-fn tmux_session_exists(name: &str) -> Result<bool, String> {
+pub fn tmux_session_exists(name: &str) -> Result<bool, String> {
     let output = Command::new("tmux")
         .arg("has-session")
         .arg("-t")
