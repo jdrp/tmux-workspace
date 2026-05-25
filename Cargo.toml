@@ -1,6 +1,6 @@
 [package]
 name = "tmux-workspace"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A small TOML-first tmux workspace launcher"
 license = "MIT"
