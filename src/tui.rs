@@ -1,5 +1,6 @@
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use std::collections::HashSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -324,6 +325,29 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
     }
 }
 
+fn format_last_used(timestamp: Option<u64>) -> String {
+    let Some(timestamp) = timestamp else {
+        return String::from("never");
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(timestamp);
+
+    let elapsed = now.saturating_sub(timestamp);
+
+    if elapsed < 60 {
+        String::from("just now")
+    } else if elapsed < 60 * 60 {
+        format!("{} minutes ago", elapsed / 60)
+    } else if elapsed < 60 * 60 * 24 {
+        format!("{} hours ago", elapsed / (60 * 60))
+    } else {
+        format!("{} days ago", elapsed / (60 * 60 * 24))
+    }
+}
+
 fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     let width = width.min(area.width.saturating_sub(4));
     let height = height.min(area.height.saturating_sub(4));
@@ -451,7 +475,8 @@ fn render_workspace_details(frame: &mut Frame, app: &App, area: Rect) {
     let text = match app.selected_workspace() {
         Some(workspace) => {
             let running = app.is_running(workspace);
-            workspace_details_text(workspace, running)
+            let last_used = workspace_last_used_time(&workspace.name);
+            workspace_details_text(workspace, running, last_used)
         }
         None => String::from(
             "No workspaces found.\n\nCreate one with:\n\n  tw init my-project --template rust --root .",
@@ -465,7 +490,7 @@ fn render_workspace_details(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(details, area);
 }
 
-fn workspace_details_text(workspace: &Workspace, running: bool) -> String {
+fn workspace_details_text(workspace: &Workspace, running: bool, last_used: Option<u64>) -> String {
     let mut text = String::new();
     let session = if running { "running" } else { "stopped" };
 
@@ -473,6 +498,7 @@ fn workspace_details_text(workspace: &Workspace, running: bool) -> String {
     text.push_str(&format!("template: {}\n\n", workspace.template));
     text.push_str(&format!("root: {}\n\n", workspace.root));
     text.push_str(&format!("session: {}\n\n", session));
+    text.push_str(&format!("last used: {}\n\n", format_last_used(last_used)));
     text.push_str("windows:\n");
 
     for window in &workspace.windows {
