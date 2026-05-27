@@ -192,3 +192,9 @@ pub fn record_workspace_usage(name: &str) -> Result<(), String> {
 
     Ok(())
 }
+
+pub fn workspace_last_used_time(name: &str) -> Option<u64> {
+    load_usage_file()
+        .ok()
+        .and_then(|usage| usage.workspaces.get(name).copied())
+}

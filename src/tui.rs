@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 };
 
-use crate::storage::{delete_workspace_file, list_workspaces};
+use crate::storage::{delete_workspace_file, list_workspaces, workspace_last_used_time};
 use crate::tmux::tmux_session_exists;
 use crate::workspace::Workspace;
 
@@ -17,6 +17,21 @@ pub enum TuiAction {
     Start(String),
     Edit(String),
     Quit,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SortMode {
+    Name,
+    Recent,
+}
+
+impl SortMode {
+    fn label(self) -> &'static str {
+        match self {
+            SortMode::Name => "name",
+            SortMode::Recent => "recent",
+        }
+    }
 }
 
 struct App {
@@ -30,6 +45,7 @@ struct App {
     message: Option<String>,
     running_sessions: HashSet<String>,
     show_help: bool,
+    sort_mode: SortMode,
 }
 
 impl App {
@@ -54,6 +70,7 @@ impl App {
             message: None,
             running_sessions: HashSet::new(),
             show_help: false,
+            sort_mode: SortMode::Name,
         };
 
         app.refresh_running_sessions();
@@ -135,6 +152,8 @@ impl App {
             })
             .collect();
 
+        self.sort_filtered_indices();
+
         if self.filtered_indices.is_empty() {
             self.selected = 0;
         } else if self.selected >= self.filtered_indices.len() {
@@ -164,6 +183,40 @@ impl App {
 
     fn cancel_delete(&mut self) {
         self.pending_delete = None;
+    }
+
+    fn toggle_sort_mode(&mut self) {
+        self.sort_mode = match self.sort_mode {
+            SortMode::Name => SortMode::Recent,
+            SortMode::Recent => SortMode::Name,
+        };
+
+        self.apply_filter();
+    }
+
+    fn sort_filtered_indices(&mut self) {
+        match self.sort_mode {
+            SortMode::Name => {
+                self.filtered_indices.sort_by(|&left, &right| {
+                    let left_name = self.workspaces[left].name.to_lowercase();
+                    let right_name = self.workspaces[right].name.to_lowercase();
+
+                    left_name.cmp(&right_name)
+                });
+            }
+            SortMode::Recent => {
+                self.filtered_indices.sort_by(|&left, &right| {
+                    let left_ts =
+                        workspace_last_used_time(&self.workspaces[left].name).unwrap_or(0);
+                    let right_ts =
+                        workspace_last_used_time(&self.workspaces[right].name).unwrap_or(0);
+
+                    right_ts
+                        .cmp(&left_ts)
+                        .then_with(|| self.workspaces[left].name.cmp(&self.workspaces[right].name))
+                });
+            }
+        }
     }
 }
 
@@ -244,6 +297,7 @@ fn run_app(terminal: &mut DefaultTerminal, app: &mut App) -> Result<TuiAction, S
             match key.code {
                 KeyCode::Char('q') => return Ok(TuiAction::Quit),
                 KeyCode::Char('?') => app.show_help = true,
+                KeyCode::Char('o') => app.toggle_sort_mode(),
                 KeyCode::Char('j') | KeyCode::Down => app.next(),
                 KeyCode::Char('k') | KeyCode::Up => app.previous(),
                 KeyCode::Char('r') => app.refresh()?,
@@ -383,8 +437,10 @@ fn render_workspace_list(frame: &mut Frame, app: &mut App, area: Rect) {
             .collect()
     };
 
+    let title = format!("Workspaces sorted by {}", app.sort_mode.label());
+
     let list = List::new(items)
-        .block(Block::default().title("Workspaces").borders(Borders::ALL))
+        .block(Block::default().title(title).borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
@@ -463,9 +519,9 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     let keybinds = if app.search_mode {
         "Esc clear  "
     } else if app.search.is_empty() {
-        "↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   ? help   q quit  "
+        "↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   o sort   ? help   q quit  "
     } else {
-        "Esc clear   ↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   ? help   q quit  "
+        "Esc clear   ↑/↓ j/k move   Enter start   e edit   d delete   r refresh   / search   o sort   ? help   q quit  "
     };
 
     let left_footer = Paragraph::new(Line::from(search_text));
