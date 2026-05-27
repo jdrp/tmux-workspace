@@ -1,15 +1,25 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
 
 use crate::workspace::{Workspace, workspace_to_toml};
 
-pub fn workspaces_dir() -> PathBuf {
+#[derive(Default, Deserialize, Serialize)]
+struct UsageFile {
+    workspaces: BTreeMap<String, u64>,
+}
+
+pub fn config_dir() -> PathBuf {
     let home = std::env::var("HOME").expect("HOME environment variable is not set");
 
-    PathBuf::from(home)
-        .join(".config")
-        .join("tmux-workspace")
-        .join("workspaces")
+    PathBuf::from(home).join(".config").join("tmux-workspace")
+}
+
+pub fn workspaces_dir() -> PathBuf {
+    config_dir().join("workspaces")
 }
 
 pub fn workspace_file_path(name: &str) -> PathBuf {
@@ -135,4 +145,50 @@ pub fn load_workspace(name: &str) -> Result<Workspace, String> {
     }
 
     read_workspace_file(&path)
+}
+
+fn usage_file_path() -> PathBuf {
+    config_dir().join("usage.toml")
+}
+
+fn load_usage_file() -> Result<UsageFile, String> {
+    let path = usage_file_path();
+
+    if !path.exists() {
+        return Ok(UsageFile::default());
+    }
+
+    let content =
+        fs::read_to_string(&path).map_err(|error| format!("failed to read usage file: {error}"))?;
+
+    toml::from_str::<UsageFile>(&content)
+        .map_err(|error| format!("failed to parse usage file: {error}"))
+}
+
+fn write_usage_file(usage: &UsageFile) -> Result<(), String> {
+    let dir = config_dir();
+
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create config directory: {error}"))?;
+
+    let path = usage_file_path();
+    let toml = toml::to_string_pretty(usage)
+        .map_err(|error| format!("failed to serialize usage file: {error}"))?;
+
+    fs::write(&path, toml).map_err(|error| format!("failed to write usage file: {error}"))?;
+
+    Ok(())
+}
+
+pub fn record_workspace_usage(name: &str) -> Result<(), String> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to read system time: {error}"))?
+        .as_secs();
+
+    let mut usage = load_usage_file()?;
+    usage.workspaces.insert(name.to_string(), now);
+    write_usage_file(&usage)?;
+
+    Ok(())
 }

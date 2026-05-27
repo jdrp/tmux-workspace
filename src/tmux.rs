@@ -1,6 +1,6 @@
 use std::process::{Command, Output};
 
-use crate::storage::load_workspace;
+use crate::storage::{load_workspace, record_workspace_usage};
 use crate::workspace::{Window, Workspace};
 
 fn check_tmux_exists() -> Result<(), String> {
@@ -299,6 +299,8 @@ pub fn start_workspace(name: &str, dry_run: bool) -> Result<(), String> {
         print_start_plan(&workspace);
         return Ok(());
     }
+
+    record_workspace_usage(&workspace.name)?;
 
     check_tmux_exists()?;
 
